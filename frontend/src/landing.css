@@ -1,0 +1,270 @@
+/* ==========================================================================
+   MIRAGE — marketing landing page styling
+   Verbatim from the reference design system (dark cosmic aesthetic).
+   Scoped under .marketing-site so it cannot leak into the dashboard.
+   ========================================================================== */
+/* ==========================================================================
+   MARKETING LANDING PAGE & AI SAAS AUTH STYLING (DARK COSMIC AESTHETIC)
+   ========================================================================== */
+
+.marketing-site {
+  --cosmic-bg: #040408;
+  --cosmic-surface: #0b0c15;
+  --cosmic-border: rgba(255, 255, 255, 0.12);
+  --cosmic-purple: #6e44ff;
+  --cosmic-purple-glow: rgba(110, 68, 255, 0.6);
+  --cosmic-cyan: #38bdf8;
+  --cosmic-emerald: #10b981;
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  background-color: #040408 !important;
+  color: #ffffff !important;
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* NO HARSH REPEATING DOTS OR GRIDS */
+.marketing-site::before,
+.marketing-site::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Fluid Celestial Nebula Cloud Animations */
+@keyframes nebulaDrift1 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate(30px, -20px) scale(1.1);
+    opacity: 0.8;
+  }
+}
+
+@keyframes nebulaDrift2 {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.55;
+  }
+  50% {
+    transform: translate(-30px, 25px) scale(1.12);
+    opacity: 0.75;
+  }
+}
+
+@keyframes beamShimmerPulse {
+  0%, 100% {
+    opacity: 0.9;
+    filter: drop-shadow(0 0 25px rgba(168, 85, 247, 0.7)) drop-shadow(0 0 60px rgba(139, 92, 246, 0.4));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 45px rgba(192, 132, 252, 0.95)) drop-shadow(0 0 95px rgba(168, 85, 247, 0.65));
+  }
+}
+
+@keyframes streamFlow {
+  0% {
+    stroke-dashoffset: 3000;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes starTwinkle {
+  0%, 100% {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3);
+  }
+}
+
+@keyframes floatY {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+
+.animate-nebula-1     { animation: nebulaDrift1 16s ease-in-out infinite; }
+.animate-nebula-2     { animation: nebulaDrift2 20s ease-in-out infinite; }
+.animate-beam-shimmer { animation: beamShimmerPulse 6s ease-in-out infinite; }
+.animate-stream-flow  { animation: streamFlow 22s linear infinite; }
+.animate-star-twinkle { animation: starTwinkle 3.5s ease-in-out infinite; }
+.animate-float        { animation: floatY 5s ease-in-out infinite; }
+
+/* Custom Scrollbar for Landing Page & Console */
+.marketing-site ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.marketing-site ::-webkit-scrollbar-track {
+  background: #06070c;
+}
+.marketing-site ::-webkit-scrollbar-thumb {
+  background: #232538;
+  border-radius: 9999px;
+}
+.marketing-site ::-webkit-scrollbar-thumb:hover {
+  background: #6e44ff;
+}
+
+/* ==========================================================================
+   ADVANCED DASHBOARD VISUALIZATIONS & RECHARTS STYLING
+   ========================================================================== */
+
+.custom-recharts-tooltip {
+  background: #0f172a !important;
+  border: 1px solid #334155 !important;
+  border-radius: 8px !important;
+  padding: 8px 12px !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5) !important;
+  color: #f8fafc !important;
+  font-size: 11px !important;
+  line-height: 1.4 !important;
+  pointer-events: none;
+  z-index: 50;
+  min-width: 140px;
+}
+
+.custom-recharts-tooltip-title {
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  font-size: 11px;
+  border-bottom: 1px solid #1e293b;
+  padding-bottom: 3px;
+}
+
+.custom-recharts-tooltip-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 3px;
+}
+
+.overview-grid-equal {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.overview-grid-tri {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 1080px) {
+  .overview-grid-equal,
+  .overview-grid-tri {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   REACT FLOW CANVAS & CONTROLS SLEEK DARK STYLING
+   ========================================================================== */
+
+.react-flow__panel {
+  margin: 16px !important;
+}
+
+.react-flow__controls {
+  border-radius: 12px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  background: rgba(18, 20, 28, 0.9) !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6) !important;
+  width: auto !important;
+  max-width: 36px !important;
+}
+
+.react-flow__controls-button {
+  background: rgba(18, 20, 28, 0.92) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-right: none !important;
+  color: #94a3b8 !important;
+  fill: #94a3b8 !important;
+  width: 34px !important;
+  height: 34px !important;
+  padding: 6px !important;
+  transition: all 0.15s ease !important;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__controls-button:hover {
+  background: rgba(30, 41, 59, 0.95) !important;
+  color: #10b981 !important;
+  fill: #10b981 !important;
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor !important;
+  stroke: currentColor !important;
+  max-width: 14px !important;
+  max-height: 14px !important;
+}
+
+.react-flow__minimap {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  background: rgba(15, 17, 26, 0.92) !important;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.65) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* ============================================================= */
+/* INFINITE MOVING MARQUEE TICKER STRIP */
+/* ============================================================= */
+@keyframes marqueeScroll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes marqueeScrollReverse {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+
+.animate-marquee-infinite {
+  display: flex;
+  width: max-content;
+  animation: marqueeScroll 30s linear infinite;
+}
+
+.animate-marquee-infinite:hover {
+  animation-play-state: paused;
+}
+
+.animate-marquee-reverse {
+  display: flex;
+  width: max-content;
+  animation: marqueeScrollReverse 34s linear infinite;
+}
+
+.animate-marquee-reverse:hover {
+  animation-play-state: paused;
+}
+
+
+

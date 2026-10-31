@@ -4,21 +4,31 @@ import uuid
 import os
 import datetime as dt
 from collections import defaultdict
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse
-from sqlalchemy import select, func
+from sqlalchemy import select
 
-from .db import SessionLocal, EventRow, IncidentRow, ActionRow, init_db
+from .db import (
+    SessionLocal, EventRow, IncidentRow, ActionRow,
+    IncidentEventRow, AttackerRow, AuditLogRow, init_db
+)
 from .schema import NormalizedEvent
 from . import collector
 from .engine.classify import classify
 from .engine.evaluate import evaluate
-from .engine.respond import recommend, execute
-from .engine.stix import bundle, csv_iocs
-from .geo import geo, ALIAS, get_raw_ips
+from .engine.respond import recommend
+from .geo import geo
 
-app = FastAPI(title="MIRAGE SOC API", version="1.0.0")
+from .api import (
+    health, metrics, events, incidents,
+    attackers, techniques, actions, exports, demo
+)
+
+app = FastAPI(
+    title="MIRAGE SOC API",
+    version="1.0.0",
+    description="Deception-Driven Threat Detection & Active Containment SOC Platform"
+)
 
 # CORS enabled for hackathon lab dashboard frontend
 app.add_middleware(
@@ -33,6 +43,17 @@ clients: set[WebSocket] = set()
 _ip_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
 _sim_cmd_dir = os.environ.get("SIM_CMD_DIR", "/sim_cmd")
 _blocklist_path = os.environ.get("BLOCKLIST_PATH", "/shared/blocklist.txt")
+
+# Include all modular routers (providing /api/v1/* and legacy /api/* aliases)
+app.include_router(health.router)
+app.include_router(metrics.router)
+app.include_router(events.router)
+app.include_router(incidents.router)
+app.include_router(attackers.router)
+app.include_router(techniques.router)
+app.include_router(actions.router)
+app.include_router(exports.router)
+app.include_router(demo.router)
 
 async def broadcast(kind: str, payload: dict):
     dead = []
@@ -62,17 +83,40 @@ async def on_event(ev: dict):
 
     # 2. Persist event
     with SessionLocal() as db:
-        db.add(EventRow(
-            id=ev["id"],
-            ts=ev["ts"],
-            source=ev["source"],
-            zone=ev["zone"],
-            src_ip=src_ip,
-            session_id=ev.get("session_id"),
-            action=ev["action"],
-            outcome=ev["outcome"],
-            data=ev
-        ))
+        existing = db.get(EventRow, ev["id"])
+        if existing:
+            existing.ts = ev["ts"]
+            existing.data = ev
+            existing.action = ev["action"]
+            existing.event_type = ev["action"]
+            existing.cmd = ev.get("cmd")
+            existing.command = ev.get("cmd")
+            existing.user = ev.get("user")
+            existing.username = ev.get("user")
+        else:
+            db.add(EventRow(
+                id=ev["id"],
+                event_id=ev["id"],
+                ts=ev["ts"],
+                source=ev["source"],
+                sensor=ev.get("sensor"),
+                zone=ev.get("zone", "deception"),
+                src_ip=src_ip,
+                session_id=ev.get("session_id"),
+                action=ev["action"],
+                event_type=ev["action"],
+                outcome=ev["outcome"],
+                dst_service=ev.get("dst_service"),
+                dst_port=ev.get("dst_port"),
+                destination_asset=ev.get("sensor"),
+                destination_port=ev.get("dst_port"),
+                user=ev.get("user"),
+                username=ev.get("user"),
+                cmd=ev.get("cmd"),
+                command=ev.get("cmd"),
+                data=ev,
+                raw_event=ev.get("raw")
+            ))
         db.commit()
 
     # 3. Live WebSocket broadcast of the event
@@ -123,19 +167,43 @@ async def on_event(ev: dict):
                 inc["actions"] = final_actions
 
             if not row:
-                row = IncidentRow(id=iid, src_ip=src_ip)
+                row = IncidentRow(id=iid, incident_key=iid, src_ip=src_ip)
                 db.add(row)
 
+            row.title = f"{inc['severity'].upper()} threat from {src_ip}"
+            row.description = inc.get("narrative")
             row.first_seen = inc["first_seen"]
             row.last_seen = inc["last_seen"]
             row.score = inc["score"]
+            row.risk_score = inc["score"]
             row.severity = inc["severity"]
             row.verdict = inc["verdict"]
             row.stage = inc["stage"]
             row.status = old_status
             row.real_asset_touched = inc["real_asset_touched"]
             row.honeytoken_hit = inc["honeytoken_hit"]
+            row.event_count = len(inc.get("timeline", []))
             row.body = inc
+
+            # Update Attacker profile
+            att = db.get(AttackerRow, src_ip)
+            if not att:
+                att = AttackerRow(
+                    id=src_ip,
+                    source_ip=src_ip,
+                    display_identity=src_ip,
+                    first_seen=inc["first_seen"],
+                    last_seen=inc["last_seen"],
+                    total_events=len(inc.get("timeline", [])),
+                    total_incidents=1,
+                    risk_level=inc["severity"]
+                )
+                db.add(att)
+            else:
+                att.last_seen = inc["last_seen"]
+                att.risk_level = inc["severity"]
+                att.total_events = len(inc.get("timeline", []))
+
             db.commit()
 
         # Broadcast updated incident
@@ -163,206 +231,6 @@ async def websocket_endpoint(w: WebSocket):
         clients.discard(w)
     except Exception:
         clients.discard(w)
-
-@app.get("/health")
-def health():
-    try:
-        with SessionLocal() as db:
-            db.execute(select(1)).first()
-        return {"status": "ok", "db": "connected", "utc": dt.datetime.now(dt.timezone.utc).isoformat()}
-    except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "detail": str(e)})
-
-@app.get("/api/stats")
-def stats():
-    with SessionLocal() as db:
-        ev_count = db.query(EventRow).count()
-        incidents_all = db.query(IncidentRow).all()
-        crit = [i for i in incidents_all if i.severity == "critical" and i.status == "open"]
-        noise = [i for i in incidents_all if i.verdict == "opportunistic"]
-        contained = [i for i in incidents_all if i.status == "contained"]
-        
-        suppressed_pct = round(100.0 * (1.0 - (len(incidents_all) / ev_count)), 1) if ev_count > 0 else 0.0
-
-        return {
-            "raw_events": ev_count,
-            "incidents": len(incidents_all),
-            "critical_open": len(crit),
-            "opportunistic": len(noise),
-            "contained": len(contained),
-            "noise_suppressed_pct": suppressed_pct
-        }
-
-@app.get("/api/events")
-def get_events(limit: int = Query(default=200, le=2000)):
-    with SessionLocal() as db:
-        rows = db.query(EventRow).order_by(EventRow.ts.desc()).limit(limit).all()
-        return [r.data for r in rows]
-
-@app.get("/api/incidents")
-def get_incidents():
-    order_map = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    with SessionLocal() as db:
-        rows = db.query(IncidentRow).all()
-        sorted_rows = sorted(rows, key=lambda r: (order_map.get(r.severity, 4), -r.score))
-        return [
-            {
-                "id": r.id,
-                "src_ip": r.src_ip,
-                "severity": r.severity,
-                "score": r.score,
-                "verdict": r.verdict,
-                "stage": r.stage,
-                "status": r.status,
-                "first_seen": r.first_seen,
-                "last_seen": r.last_seen,
-                "real_asset_touched": r.real_asset_touched,
-                "honeytoken_hit": r.honeytoken_hit,
-                "country": (r.body or {}).get("country", "XX"),
-                "asn": (r.body or {}).get("asn", "Unknown")
-            }
-            for r in sorted_rows
-        ]
-
-@app.get("/api/incidents/{iid}")
-def get_incident(iid: str):
-    with SessionLocal() as db:
-        r = db.get(IncidentRow, iid)
-        if not r:
-            raise HTTPException(status_code=404, detail=f"Incident {iid} not found")
-        data = dict(r.body or {})
-        data["status"] = r.status
-        return data
-
-@app.post("/api/incidents/{iid}/actions/{aid}")
-async def handle_action(iid: str, aid: str, mode: str = "approve"):
-    if mode not in ("approve", "dry_run"):
-        raise HTTPException(status_code=400, detail="Mode must be 'approve' or 'dry_run'")
-
-    with SessionLocal() as db:
-        r = db.get(IncidentRow, iid)
-        if not r:
-            raise HTTPException(status_code=404, detail="Incident not found")
-
-        body = dict(r.body or {})
-        actions = body.get("actions", [])
-        action_match = next((a for a in actions if a["id"] == aid), None)
-        if not action_match:
-            raise HTTPException(status_code=404, detail="Action not found on this incident")
-
-        # Supply raw IPs for block enforcement
-        if action_match["type"] == "block_source":
-            action_match["params"]["raw_ips"] = get_raw_ips(r.src_ip)
-
-        try:
-            result_str = execute(action_match, dry_run=(mode == "dry_run"), blocklist_path=_blocklist_path)
-            action_match["result"] = result_str
-            action_match["status"] = "dry_run" if mode == "dry_run" else "executed"
-
-            if mode == "approve" and action_match["type"] == "block_source":
-                r.status = "contained"
-                body["status"] = "contained"
-
-            # Record action in audit log
-            db.add(ActionRow(
-                id=uuid.uuid4().hex[:12],
-                incident_id=iid,
-                type=action_match["type"],
-                params=action_match["params"],
-                status=action_match["status"],
-                result=result_str
-            ))
-
-            r.body = body
-            db.commit()
-
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-
-    await broadcast("incident", body | {"status": r.status})
-    return action_match
-
-@app.get("/api/incidents/{iid}/export/stix")
-def export_stix(iid: str):
-    with SessionLocal() as db:
-        r = db.get(IncidentRow, iid)
-        if not r:
-            raise HTTPException(status_code=404, detail="Incident not found")
-        return JSONResponse(content=bundle(r.body or {}))
-
-@app.get("/api/incidents/{iid}/export/csv")
-def export_csv(iid: str):
-    with SessionLocal() as db:
-        r = db.get(IncidentRow, iid)
-        if not r:
-            raise HTTPException(status_code=404, detail="Incident not found")
-        return PlainTextResponse(content=csv_iocs(r.body or {}), media_type="text/csv")
-
-@app.get("/api/attack-matrix")
-def attack_matrix():
-    with SessionLocal() as db:
-        hits = {}
-        for r in db.query(IncidentRow).all():
-            for t in (r.body or {}).get("techniques", []):
-                t_id = t["id"]
-                if t_id not in hits:
-                    hits[t_id] = {**t, "count": 0}
-                hits[t_id]["count"] += 1
-        return list(hits.values())
-
-@app.get("/api/export/ecs.ndjson")
-def export_ecs():
-    def ecs_format(e: dict) -> dict:
-        return {
-            "@timestamp": e.get("ts"),
-            "source": {"ip": e.get("src_ip")},
-            "event": {
-                "action": e.get("action"),
-                "outcome": e.get("outcome"),
-                "category": e.get("category")
-            },
-            "user": {"name": e.get("user")},
-            "process": {"command_line": e.get("cmd")},
-            "file": {"hash": {"sha256": (e.get("file") or {}).get("sha256")}},
-            "host": {"name": e.get("sensor")},
-            "threat": {"technique": {"id": e.get("techniques", [])}},
-            "labels": {"zone": e.get("zone"), "flags": e.get("flags", [])}
-        }
-
-    with SessionLocal() as db:
-        events = db.query(EventRow).order_by(EventRow.ts).all()
-        lines = "\n".join(json.dumps(ecs_format(r.data)) for r in events)
-        return PlainTextResponse(lines, media_type="application/x-ndjson")
-
-# NOTE: /api/demo/reset MUST be declared before /api/demo/{scenario} to prevent router collision
-@app.post("/api/demo/reset")
-async def demo_reset():
-    with SessionLocal() as db:
-        db.query(EventRow).delete()
-        db.query(IncidentRow).delete()
-        db.query(ActionRow).delete()
-        db.commit()
-
-    collector.reset_scan_detector()
-
-    if os.path.exists(_blocklist_path):
-        with open(_blocklist_path, "w", encoding="utf-8") as f:
-            f.write("")
-
-    await broadcast("reset", {"ok": True})
-    return {"ok": True, "detail": "MIRAGE demo environment reset to pristine state"}
-
-@app.post("/api/demo/{scenario}")
-def demo_trigger(scenario: str):
-    if scenario not in ("targeted", "noise"):
-        raise HTTPException(status_code=400, detail="Invalid scenario. Choose 'targeted' or 'noise'")
-    
-    os.makedirs(_sim_cmd_dir, exist_ok=True)
-    cmd_file = os.path.join(_sim_cmd_dir, "trigger.json")
-    with open(cmd_file, "w", encoding="utf-8") as f:
-        json.dump({"scenario": scenario, "id": uuid.uuid4().hex}, f)
-
-    return {"ok": True, "scenario": scenario, "status": "triggered"}
 
 @app.post("/api/_seed")
 async def seed_events(events: list[dict]):

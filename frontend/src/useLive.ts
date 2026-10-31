@@ -60,8 +60,11 @@ function useLiveState() {
     let retryCount = 0;
     const connect = () => {
       if (stopped) return;
+      const configured = process.env.NEXT_PUBLIC_WS_URL;
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.hostname}:8000/ws/live`;
+      const wsUrl = configured && configured.length > 0
+        ? configured
+        : `${protocol}//${window.location.hostname}:8000/ws/live`;
 
       try {
         const ws = new WebSocket(wsUrl);

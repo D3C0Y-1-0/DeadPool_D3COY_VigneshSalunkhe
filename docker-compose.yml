@@ -117,17 +117,21 @@ services:
       - blocklist:/shared
       - sim_cmd:/sim_cmd
       - ./backend/app:/srv/app
+      - ./backend/alembic:/srv/alembic
     restart: unless-stopped
 
   web:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        MIRAGE_API_URL: http://api:8000
     networks:
       - mgmt_net
     ports:
-      - "5173:80"
-    volumes:
-      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./frontend/dist:/usr/share/nginx/html:ro
+      - "5173:3000"
+      - "3000:3000"
+    environment:
+      - MIRAGE_API_URL=http://api:8000
     depends_on:
       - api
     restart: unless-stopped

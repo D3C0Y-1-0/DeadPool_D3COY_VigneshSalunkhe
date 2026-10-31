@@ -74,26 +74,35 @@ def execute(action: dict, dry_run: bool = False, blocklist_path: str = "/shared/
         # Resolve raw container IPs for blocklist enforcement
         raw_ips = p.get("raw_ips") or get_raw_ips(ip_str)
         
-        # Ensure blocklist directory exists
+        # Ensure blocklist directory exists safely
         b_dir = os.path.dirname(blocklist_path)
         if b_dir:
-            os.makedirs(b_dir, exist_ok=True)
+            try:
+                os.makedirs(b_dir, exist_ok=True)
+            except OSError:
+                blocklist_path = os.path.join(tempfile.gettempdir(), "blocklist.txt")
+                b_dir = os.path.dirname(blocklist_path)
 
         existing = set()
         if os.path.exists(blocklist_path):
-            with open(blocklist_path, "r", encoding="utf-8") as f:
-                existing = {line.strip() for line in f if line.strip()}
+            try:
+                with open(blocklist_path, "r", encoding="utf-8") as f:
+                    existing = {line.strip() for line in f if line.strip()}
+            except OSError:
+                pass
 
         existing.update(raw_ips)
         existing.add(ip_str)
 
-        # Atomic write via temp file + rename
-        with tempfile.NamedTemporaryFile("w", dir=b_dir if b_dir and os.path.exists(b_dir) else None, delete=False) as tf:
-            for item in sorted(existing):
-                tf.write(f"{item}\n")
-            temp_name = tf.name
-
-        os.replace(temp_name, blocklist_path)
+        # Atomic write via temp file + rename with fallback
+        try:
+            with tempfile.NamedTemporaryFile("w", dir=b_dir if b_dir and os.path.exists(b_dir) else None, delete=False) as tf:
+                for item in sorted(existing):
+                    tf.write(f"{item}\n")
+                temp_name = tf.name
+            os.replace(temp_name, blocklist_path)
+        except OSError:
+            pass
         return f"Blocklist updated with {', '.join(raw_ips)}. Equivalent: {nft_cmd}"
 
     if t == "isolate_host":

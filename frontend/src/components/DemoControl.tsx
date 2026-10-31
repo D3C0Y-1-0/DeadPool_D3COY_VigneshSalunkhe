@@ -45,78 +45,78 @@ export default function DemoControl({ isOpen, onClose, onRefresh }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#111827] border border-[#1f2a3d] rounded-xl max-w-md w-full p-5 shadow-2xl relative">
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white border border-slate-200 rounded-xl max-w-md w-full p-5 shadow-2xl relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-[#8a97ad] hover:text-[#e6edf7] cursor-pointer"
+          className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
 
         <div className="flex items-center gap-2 mb-3">
-          <Zap className="w-5 h-5 text-[#4da3ff]" />
-          <h2 className="text-base font-bold text-[#e6edf7] uppercase tracking-wide">
+          <Zap className="w-5 h-5 text-slate-700" />
+          <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide">
             Interactive Demo Control
           </h2>
         </div>
 
-        <p className="text-xs text-[#8a97ad] mb-4">
-          Authorised deception lab simulator. Generates live synthetic adversary telemetry inside the isolated <code className="mono text-[#4da3ff]">attacker_net</code> container network.
+        <p className="text-xs text-slate-500 mb-4">
+          Authorised deception lab simulator. Generates live synthetic adversary telemetry inside the isolated <code className="mono text-slate-700">attacker_net</code> container network.
         </p>
 
         <div className="space-y-3">
-          <div className="p-3 rounded-lg border border-[#ff3b5c]/30 bg-[#ff3b5c]/5 flex items-center justify-between">
+          <div className="p-3 rounded-lg border border-red-200 bg-red-50 flex items-center justify-between">
             <div>
-              <div className="text-xs font-bold text-[#ff3b5c] uppercase">
+              <div className="text-xs font-bold text-red-700 uppercase">
                 Targeted Attack (PS 04 Scenario)
               </div>
-              <div className="text-[11px] text-[#8a97ad] mt-0.5">
+              <div className="text-[11px] text-slate-500 mt-0.5">
                 Full kill-chain: Scan → Decoy SSH → Stolen Creds → Prod Pivot
               </div>
             </div>
             <button
               onClick={() => handleTrigger("targeted")}
               disabled={runningScenario !== null}
-              className="px-3 py-1.5 bg-[#ff3b5c] hover:bg-[#e02b4c] text-white rounded text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+              className="danger-btn text-xs flex items-center gap-1"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
               {runningScenario === "targeted" ? "Running..." : "Launch"}
             </button>
           </div>
 
-          <div className="p-3 rounded-lg border border-[#4da3ff]/30 bg-[#4da3ff]/5 flex items-center justify-between">
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between">
             <div>
-              <div className="text-xs font-bold text-[#4da3ff] uppercase">
+              <div className="text-xs font-bold text-slate-700 uppercase">
                 Background Noise Storm
               </div>
-              <div className="text-[11px] text-[#8a97ad] mt-0.5">
+              <div className="text-[11px] text-slate-500 mt-0.5">
                 Simulates 15+ automated botnet scanners & rapid dictionary attacks
               </div>
             </div>
             <button
               onClick={() => handleTrigger("noise")}
               disabled={runningScenario !== null}
-              className="px-3 py-1.5 bg-[#4da3ff] hover:bg-[#3b82f6] text-white rounded text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors"
+              className="primary-btn text-xs flex items-center gap-1"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
               {runningScenario === "noise" ? "Spamming..." : "Noise"}
             </button>
           </div>
 
-          <div className="p-3 rounded-lg border border-[#1f2a3d] bg-[#0a0e17] flex items-center justify-between">
+          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between">
             <div>
-              <div className="text-xs font-bold text-[#e6edf7] uppercase">
+              <div className="text-xs font-bold text-slate-900 uppercase">
                 Reset Demo Environment
               </div>
-              <div className="text-[11px] text-[#8a97ad] mt-0.5">
+              <div className="text-[11px] text-slate-500 mt-0.5">
                 Flushes database tables and resets prod firewall blocklist
               </div>
             </div>
             <button
               onClick={handleReset}
               disabled={runningScenario !== null}
-              className="px-3 py-1.5 bg-[#1f2a3d] hover:bg-slate-700 text-[#e6edf7] rounded text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors border border-[#334155]"
+              className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors border border-slate-300"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               {runningScenario === "reset" ? "Resetting..." : "Reset"}
@@ -125,13 +125,13 @@ export default function DemoControl({ isOpen, onClose, onRefresh }: Props) {
         </div>
 
         {msg && (
-          <div className="mt-4 p-2 rounded bg-[#0a0e17] border border-[#1f2a3d] text-xs mono text-[#3dd6a8] flex items-center gap-2">
+          <div className="mt-4 p-2 rounded bg-slate-50 border border-slate-200 text-xs mono text-emerald-700 flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
             <span className="truncate">{msg}</span>
           </div>
         )}
 
-        <div className="mt-4 text-[11px] text-[#8a97ad] text-center border-t border-[#1f2a3d] pt-3">
+        <div className="mt-4 text-[11px] text-slate-500 text-center border-t border-slate-200 pt-3">
           Lab mode: isolated • Cap-drop enabled • No egress
         </div>
       </div>

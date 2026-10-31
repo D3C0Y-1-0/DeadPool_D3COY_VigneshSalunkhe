@@ -1,18 +1,76 @@
-import React, { useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Shield, LayoutDashboard, Users, Grid, Zap, Radio } from "lucide-react";
+"use client";
+
+import { useEffect, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import {
+  Activity,
+  AlertCircle,
+  Bell,
+  Crosshair,
+  Database,
+  FileText,
+  Gauge,
+  Grid,
+  Home,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Radio,
+  RotateCw,
+  Settings as SettingsIcon,
+  ShieldCheck,
+  Users,
+  Zap,
+  Search,
+  Monitor,
+  ShieldAlert,
+  Globe,
+  LifeBuoy,
+  BookOpen,
+  LayoutDashboard
+} from "lucide-react";
 import DemoControl from "./DemoControl";
 
 interface Props {
-  children: React.ReactNode;
+  children: ReactNode;
   connected: boolean;
   onRefresh: () => void;
+  error?: string | null;
 }
 
-export default function Shell({ children, connected, onRefresh }: Props) {
-  const location = useLocation();
+const navItems = [
+  { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard/monitor", label: "Real-time Monitor", icon: Monitor },
+  { href: "/dashboard/search", label: "SIEM Search", icon: Search },
+  { href: "/dashboard/incidents", label: "Alerts", icon: Bell },
+  { href: "/dashboard/incidents", label: "Incidents", icon: Crosshair },
+  { href: "/dashboard/endpoint", label: "Endpoint Security", icon: ShieldCheck },
+  { href: "/dashboard/network", label: "Network Watch", icon: Globe },
+  { href: "/dashboard/attack-matrix", label: "Threat Intelligence", icon: Grid },
+  { href: "/dashboard/vulnerability", label: "Vulnerability Mgmt", icon: ShieldAlert },
+  { href: "/dashboard/cases", label: "Case Management", icon: Database },
+  { href: "/dashboard/reports", label: "Reports", icon: FileText },
+  { href: "/dashboard/playbooks", label: "Playbooks", icon: BookOpen },
+  { href: "/dashboard/settings", label: "Settings", icon: SettingsIcon }
+];
+
+const topNavItems = [
+  { href: "/dashboard", label: "Dashboard" },
+  { href: "/dashboard/incidents", label: "Alerts" },
+  { href: "/dashboard/incidents", label: "Incidents" },
+  { href: "/dashboard/attack-matrix", label: "Threat Intel" },
+  { href: "/dashboard/reports", label: "Reports" },
+  { href: "/dashboard/cases", label: "Cases" },
+  { href: "/dashboard/playbooks", label: "Playbooks" }
+];
+
+export default function Shell({ children, connected, onRefresh, error }: Props) {
+  const pathname = usePathname();
   const [demoOpen, setDemoOpen] = useState(false);
   const [utcTime, setUtcTime] = useState("");
+  const [sidebarOpen, setSidebarOpen] = useState(true); // Default to open for professional look
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState("not yet");
 
   useEffect(() => {
     const updateTime = () => {
@@ -23,127 +81,153 @@ export default function Shell({ children, connected, onRefresh }: Props) {
     return () => clearInterval(interval);
   }, []);
 
-  const navItems = [
-    { label: "Command Center", path: "/", icon: LayoutDashboard },
-    { label: "Attackers", path: "/attackers", icon: Users },
-    { label: "ATT&CK Matrix", path: "/attack", icon: Grid },
-  ];
+  const isActive = (href: string) =>
+    pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+      setLastRefresh(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+    } finally {
+      window.setTimeout(() => setIsRefreshing(false), 600);
+    }
+  };
 
   return (
-    <div className="flex h-screen bg-[#0a0e17] text-[#e6edf7] overflow-hidden">
-      {/* Left Navigation Rail */}
-      <aside className="w-16 md:w-56 bg-[#111827] border-r border-[#1f2a3d] flex flex-col justify-between flex-shrink-0 z-20">
-        <div>
-          {/* Logo */}
-          <div className="h-14 flex items-center px-4 border-b border-[#1f2a3d] gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#4da3ff] to-[#ff3b5c] flex items-center justify-center flex-shrink-0 shadow-md">
-              <Shield className="w-5 h-5 text-white" />
-            </div>
-            <div className="hidden md:block">
-              <div className="font-extrabold text-sm tracking-wider bg-gradient-to-r from-white to-[#4da3ff] bg-clip-text text-transparent">
-                MIRAGE
-              </div>
-              <div className="text-[10px] text-[#8a97ad] tracking-tight">
-                SOC DECEPTION FABRIC
-              </div>
-            </div>
+    <div className="dashboard-shell">
+      <aside className={`sidebar${sidebarOpen ? " is-expanded" : ""}`}>
+        <div className="sidebar-brand-row">
+          <div className="brand-mark">
+            <ShieldCheck size={22} className="text-accent" />
           </div>
-
-          {/* Navigation Links */}
-          <nav className="p-2 space-y-1 mt-2">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const active = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${
-                    active
-                      ? "bg-[#4da3ff]/15 text-[#4da3ff] border border-[#4da3ff]/40 shadow-sm"
-                      : "text-[#8a97ad] hover:text-[#e6edf7] hover:bg-[#162032]"
-                  }`}
-                  title={item.label}
-                >
-                  <Icon className="w-4 h-4 flex-shrink-0" />
-                  <span className="hidden md:block">{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
+          {sidebarOpen && (
+            <div className="sidebar-brand-copy">
+              <strong>SOC SENTINEL</strong>
+              <span>Real-time Security Operations</span>
+            </div>
+          )}
         </div>
 
-        {/* Footer info in rail */}
-        <div className="p-3 border-t border-[#1f2a3d] hidden md:block">
-          <div className="text-[10px] text-[#8a97ad] uppercase tracking-wider mb-1">
-            Deception Fabric
+        <nav aria-label="Dashboard sections" className="mt-4">
+          <div className="px-3 mb-2 text-[10px] font-bold text-mute uppercase tracking-widest">
+            {sidebarOpen ? "Data Sources" : ""}
           </div>
-          <div className="text-xs text-[#3dd6a8] font-mono flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#3dd6a8] animate-pulse" />
-            Active Decoys: 5
-          </div>
+          {navItems.map(({ href, label, icon: Icon }) => {
+            const active = isActive(href);
+            return (
+              <Link
+                key={label}
+                href={href}
+                className={`nav-link ${active ? "active" : ""}`}
+                title={sidebarOpen ? undefined : label}
+                aria-label={label}
+                aria-current={active ? "page" : undefined}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon size={18} />
+                  {sidebarOpen && <span className="nav-label">{label}</span>}
+                </div>
+                {active && sidebarOpen && <div className="w-1 h-4 bg-accent rounded-full" />}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="mt-auto px-4 py-4 border-t border-line">
+          {sidebarOpen && (
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-mute">Windows Logs</span>
+                <span className="flex items-center gap-1.5 text-low">
+                  <div className="w-1.5 h-1.5 rounded-full bg-low" /> Connected
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-mute">Firewall</span>
+                <span className="flex items-center gap-1.5 text-low">
+                  <div className="w-1.5 h-1.5 rounded-full bg-low" /> Connected
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-mute">DNS Logs</span>
+                <span className="flex items-center gap-1.5 text-low">
+                  <div className="w-1.5 h-1.5 rounded-full bg-low" /> Connected
+                </span>
+              </div>
+            </div>
+          )}
+          <Link className="sidebar-footer" href="/" aria-label="Back to landing page" title="Back to landing page">
+            <Home size={15} />
+          </Link>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top Header Bar */}
-        <header className="h-14 bg-[#111827] border-b border-[#1f2a3d] px-6 flex items-center justify-between flex-shrink-0 z-10">
-          <div className="flex items-center gap-4">
-            <span className="text-xs text-[#8a97ad] font-medium hidden sm:inline">
-              Every touch is a tell.
-            </span>
+      <main className="main-panel">
+        <header className="topbar">
+          <div className="topbar-brand">
+            <nav className="top-nav" aria-label="Primary navigation">
+              {topNavItems.map(({ href, label }) => (
+                <Link key={label} href={href} className={isActive(href) ? "active" : ""}>
+                  {label}
+                </Link>
+              ))}
+            </nav>
           </div>
 
-          <div className="flex items-center gap-3">
-            {/* UTC Clock */}
-            <div className="mono text-xs text-[#8a97ad] px-2.5 py-1 bg-[#0a0e17] border border-[#1f2a3d] rounded">
-              {utcTime}
+          <div className="topbar-actions">
+            <div className="flex items-center gap-4 mr-4">
+              <Bell size={18} className="text-mute cursor-pointer hover:text-ink transition-colors" />
+              <SettingsIcon size={18} className="text-mute cursor-pointer hover:text-ink transition-colors" />
+              <div className="flex items-center gap-2 pl-4 border-l border-line">
+                <div className="text-right hidden sm:block">
+                  <div className="text-xs font-bold text-ink leading-tight">Analyst</div>
+                  <div className="text-[10px] text-mute leading-tight">Tier 1 Analyst</div>
+                </div>
+                <div className="w-8 h-8 rounded-full bg-panel-card border border-line flex items-center justify-center overflow-hidden">
+                  <Users size={16} className="text-mute" />
+                </div>
+              </div>
             </div>
-
-            {/* Live WS Pulse Pill */}
-            <div
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs mono font-semibold border ${
-                connected
-                  ? "bg-[#3dd6a8]/10 text-[#3dd6a8] border-[#3dd6a8]/40"
-                  : "bg-[#f5c542]/10 text-[#f5c542] border-[#f5c542]/40"
-              }`}
-            >
-              <Radio className={`w-3.5 h-3.5 ${connected ? "animate-pulse" : ""}`} />
-              {connected ? "LIVE" : "RECONNECTING"}
-            </div>
-
-            {/* Demo Control Button */}
-            <button
-              onClick={() => setDemoOpen(true)}
-              className="px-3 py-1 bg-gradient-to-r from-[#4da3ff] to-[#0284c7] hover:from-[#3b82f6] hover:to-[#0369a1] text-white rounded text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-sm transition-all"
-            >
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Demo Control</span>
-            </button>
           </div>
         </header>
 
-        {/* Scrollable Page Outlet */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+        <div className="runtime-strip bg-panel/50 backdrop-blur-md">
+          <span className={`runtime-indicator ${connected ? "is-live" : ""}`}>
+            <span className="health-dot" />
+            {connected ? "Live telemetry active" : "Telemetry disconnected"}
+          </span>
+          <span className="runtime-updated border-l border-line pl-3">{utcTime}</span>
+          <button
+            className="refresh-btn ml-3"
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            type="button"
+          >
+            <RotateCw size={12} className={isRefreshing ? "animate-spin" : ""} />
+            <span>{isRefreshing ? "Syncing..." : "Sync Logs"}</span>
+          </button>
+          <button className="refresh-btn" type="button" onClick={() => setDemoOpen(true)}>
+            <Zap size={12} />
+            <span>Demo Mode</span>
+          </button>
+        </div>
+
+        <div className="page-shell">
+          {error ? (
+            <div role="alert" className="notice notice-danger mb-4">
+              <AlertCircle size={16} />
+              <div>
+                <strong>Connection Error: </strong>
+                <span className="mono">{error}</span>
+              </div>
+            </div>
+          ) : null}
           {children}
-        </main>
+        </div>
+      </main>
 
-        {/* Bottom Footer Strip */}
-        <footer className="h-7 bg-[#0a0e17] border-t border-[#1f2a3d] px-4 flex items-center justify-between text-[11px] text-[#8a97ad] flex-shrink-0">
-          <div>MITRE ATT&CK v19 Enterprise Framework</div>
-          <div className="flex items-center gap-2">
-            <span className="text-[#3dd6a8]">●</span>
-            <span>Lab Mode: Isolated Containment Active</span>
-          </div>
-        </footer>
-      </div>
-
-      <DemoControl
-        isOpen={demoOpen}
-        onClose={() => setDemoOpen(false)}
-        onRefresh={onRefresh}
-      />
+      <DemoControl isOpen={demoOpen} onClose={() => setDemoOpen(false)} onRefresh={onRefresh} />
     </div>
   );
 }

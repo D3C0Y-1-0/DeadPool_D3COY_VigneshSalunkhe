@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-31T10:55:00Z",
+  "generatedAt": "2026-10-31T12:05:00Z",
   "generatedOnPlatform": "win32",
   "projectType": "webapp",
   "setup": [
@@ -14,7 +14,7 @@
       "name": "typescript-no-emit",
       "kind": "process",
       "command": "pnpm",
-      "args": ["exec", "tsc", "--noEmit"],
+      "args": ["run", "next:typecheck"],
       "verificationMethod": "exit-code",
       "expected": "0",
       "timeoutSeconds": 180
@@ -23,17 +23,56 @@
       "name": "production-build",
       "kind": "process",
       "command": "pnpm",
-      "args": ["run", "build"],
+      "args": ["run", "next:build"],
       "verificationMethod": "exit-code",
+      "expected": "0",
+      "timeoutSeconds": 600
+    },
+    {
+      "name": "tests-pass",
+      "kind": "process",
+      "command": "pnpm",
+      "args": ["test"],
+      "verificationMethod": "test-results",
       "expected": "0",
       "timeoutSeconds": 300
     },
     {
-      "name": "dev-server-home",
+      "name": "home-route",
       "kind": "http-probe",
       "startCommand": "pnpm",
-      "startArgs": ["run", "dev", "--", "--host", "127.0.0.1"],
-      "url": "http://127.0.0.1:5173/",
+      "startArgs": ["run", "next:dev"],
+      "url": "http://127.0.0.1:3000/",
+      "verificationMethod": "http-status",
+      "expected": "200",
+      "timeoutSeconds": 120
+    },
+    {
+      "name": "attackers-route",
+      "kind": "http-probe",
+      "startCommand": "pnpm",
+      "startArgs": ["run", "next:dev"],
+      "url": "http://127.0.0.1:3000/attackers",
+      "verificationMethod": "http-status",
+      "expected": "200",
+      "timeoutSeconds": 120
+    },
+    {
+      "name": "attack-matrix-route",
+      "kind": "http-probe",
+      "startCommand": "pnpm",
+      "startArgs": ["run", "next:dev"],
+      "url": "http://127.0.0.1:3000/attack",
+      "verificationMethod": "http-status",
+      "expected": "200",
+      "timeoutSeconds": 120
+    },
+    {
+      "name": "incident-detail-route",
+      "kind": "http-probe",
+      "startCommand": "pnpm",
+      "startArgs": ["run", "next:dev"],
+      "url": "http://127.0.0.1:3000/incident/INC-203.0.113.8",
       "verificationMethod": "http-status",
       "expected": "200",
       "timeoutSeconds": 120

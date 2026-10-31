@@ -8,34 +8,36 @@ interface Props {
 
 export default function LiveFeed({ events }: Props) {
   return (
-    <div className="bg-[#111827] border border-[#1f2a3d] rounded-lg flex flex-col h-full overflow-hidden">
-      <div className="p-3 border-b border-[#1f2a3d] flex items-center justify-between">
+    <div className="panel flex flex-col h-full overflow-hidden">
+      <div className="card-title pb-2 mb-2 border-b border-slate-200">
         <div className="flex items-center gap-2">
-          <Terminal className="w-4 h-4 text-[#4da3ff]" />
-          <h2 className="text-sm font-semibold tracking-wide uppercase text-[#e6edf7]">
+          <Terminal className="w-4 h-4 text-slate-700" />
+          <h2 className="section-title tracking-wide uppercase text-slate-900">
             Live Event Feed
           </h2>
-          <span className="text-xs bg-[#1f2a3d] text-[#8a97ad] px-2 py-0.5 rounded-full mono">
+          <span className="status-badge badge-info mono">
             {events.length}
           </span>
         </div>
         <div className="flex items-center gap-2 text-xs">
-          <span className="flex items-center gap-1 text-[#8a97ad]">
-            <span className="w-2 h-2 rounded-full bg-[#ff3b5c]" /> Production Zone
+          <span className="flex items-center gap-1 text-slate-500">
+            <span className="w-2 h-2 rounded-full bg-red-500" /> Production Zone
           </span>
-          <span className="flex items-center gap-1 text-[#8a97ad]">
-            <span className="w-2 h-2 rounded-full bg-[#4da3ff]" /> Deception Zone
+          <span className="flex items-center gap-1 text-slate-500">
+            <span className="w-2 h-2 rounded-full bg-slate-400" /> Deception Zone
           </span>
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto divide-y divide-[#1f2a3d]/40 mono text-xs">
+      <div className="flex-1 overflow-y-auto divide-y divide-slate-100 mono text-xs">
         {events.length === 0 ? (
-          <div className="p-8 text-center text-[#8a97ad]">
-            <p>Waiting for first touch on deception sensors...</p>
-            <p className="text-[11px] text-[#8a97ad]/70 mt-1">
-              Decoys are listening silently on 172.28.0.0/24
-            </p>
+          <div className="empty-state">
+            <div>
+              <p>Waiting for first touch on deception sensors...</p>
+              <p className="text-[11px] text-slate-400 mt-1">
+                Decoys are listening silently on 172.28.0.0/24
+              </p>
+            </div>
           </div>
         ) : (
           events.slice(0, 150).map((ev) => {
@@ -60,26 +62,24 @@ export default function LiveFeed({ events }: Props) {
             return (
               <div
                 key={ev.id}
-                className={`p-2.5 flex items-start gap-3 hover:bg-[#162032] transition-colors ${
+                className={`p-2.5 flex items-start gap-3 hover:bg-slate-50 transition-colors ${
                   isProd
-                    ? "border-l-4 border-l-[#ff3b5c] bg-[#ff3b5c]/5"
-                    : "border-l-2 border-l-[#4da3ff]/40"
+                    ? "border-l-4 border-l-red-500 bg-red-50/40"
+                    : "border-l-2 border-l-slate-300"
                 }`}
               >
-                <span className="text-[#8a97ad] flex-shrink-0">{timeStr}</span>
+                <span className="text-slate-400 flex-shrink-0">{timeStr}</span>
                 <span
-                  className={`px-1.5 py-0.5 rounded text-[10px] uppercase font-bold flex-shrink-0 ${
-                    isProd
-                      ? "bg-[#ff3b5c]/20 text-[#ff3b5c] border border-[#ff3b5c]/40"
-                      : "bg-[#4da3ff]/15 text-[#4da3ff] border border-[#4da3ff]/30"
+                  className={`status-badge flex-shrink-0 ${
+                    isProd ? "badge-danger" : "badge-info"
                   }`}
                 >
                   {ev.sensor}
                 </span>
-                <span className="text-[#e6edf7] font-medium flex-shrink-0">
+                <span className="text-slate-900 font-medium flex-shrink-0">
                   {ev.src_ip}
                 </span>
-                <span className="text-[#8a97ad] flex-1 truncate text-slate-300">
+                <span className="text-slate-500 flex-1 truncate">
                   {actionSummary}
                 </span>
                 {ev.techniques && ev.techniques.length > 0 && (
@@ -87,7 +87,7 @@ export default function LiveFeed({ events }: Props) {
                     {ev.techniques.slice(0, 2).map((t) => (
                       <span
                         key={t}
-                        className="text-[10px] bg-[#1f2a3d] text-[#4da3ff] px-1.5 py-0.2 rounded border border-[#4da3ff]/30"
+                        className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200"
                       >
                         {t}
                       </span>

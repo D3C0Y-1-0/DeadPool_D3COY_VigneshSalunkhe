@@ -1,7 +1,7 @@
-import React from "react";
-import ReactFlow, { Background, Node, Edge, MarkerType } from "reactflow";
-import "reactflow/dist/style.css";
-import { TimelineItem } from "../types";
+"use client";
+
+import { Background, MarkerType, ReactFlow, type Edge, type Node } from "@xyflow/react";
+import type { TimelineItem } from "../types";
 
 interface Props {
   timeline: TimelineItem[];
@@ -29,37 +29,37 @@ export default function AttackChainGraph({ timeline, realAssetTouched }: Props) 
     return {
       id: String(i),
       position: {
-        x: i * 220 + 30,
-        y: isProd ? 130 : 25
+        x: i * 240 + 40,
+        y: isProd ? 150 : 30
       },
       data: {
         label: (
           <div className="text-left text-xs p-1 select-none">
-            <div className="flex items-center justify-between mb-1">
-              <span className={`text-[10px] font-bold uppercase tracking-wider px-1 py-0.5 rounded ${
-                isProd ? "bg-[#ff3b5c]/30 text-[#ff3b5c]" : "bg-[#4da3ff]/20 text-[#4da3ff]"
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-[8px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border ${
+                isProd ? "bg-crit/20 text-crit border-crit/30" : "bg-accent/20 text-accent border-accent/30"
               }`}>
                 {isProd ? "REAL ASSET" : "DECEPTION"}
               </span>
-              <span className="mono text-[10px] text-[#8a97ad]">{s.sensor}</span>
+              <span className="mono text-[9px] text-mute">{s.sensor}</span>
             </div>
-            <div className="font-bold text-[#e6edf7] truncate mb-0.5">{title}</div>
+            <div className="font-bold text-ink truncate mb-1 text-[11px] uppercase tracking-wider">{title}</div>
             {techniquesStr && (
-              <div className="mono text-[10px] text-[#4da3ff] mb-1">{techniquesStr}</div>
+              <div className="mono text-[9px] text-mute mb-2 bg-black/30 px-1.5 py-0.5 rounded border border-line">{techniquesStr}</div>
             )}
-            <div className="text-[11px] text-[#8a97ad] truncate">
-              {s.summary.slice(0, 32)}
+            <div className="text-[10px] text-mute leading-tight opacity-80 group-hover:opacity-100 transition-opacity">
+              {s.summary.slice(0, 40)}...
             </div>
           </div>
         )
       },
       style: {
-        background: isProd ? "#2a0812" : "#111827",
+        background: isProd ? "#1a0b0b" : "#0f172a",
         border: `1.5px solid ${isProd ? "#ff3b5c" : "#1f2a3d"}`,
-        borderRadius: "8px",
-        width: 190,
+        borderRadius: "12px",
+        width: 210,
         color: "#e6edf7",
-        boxShadow: isProd ? "0 0 15px rgba(255,59,92,0.3)" : "none"
+        boxShadow: isProd ? "0 0 25px rgba(255,59,92,0.15)" : "0 4px 12px rgba(0,0,0,0.2)"
       }
     };
   });
@@ -75,7 +75,7 @@ export default function AttackChainGraph({ timeline, realAssetTouched }: Props) 
       animated: true,
       style: {
         stroke: isTransitionToProd ? "#ff3b5c" : "#4da3ff",
-        strokeWidth: isTransitionToProd ? 2.5 : 1.5
+        strokeWidth: isTransitionToProd ? 3 : 2
       },
       markerEnd: {
         type: MarkerType.ArrowClosed,
@@ -85,13 +85,15 @@ export default function AttackChainGraph({ timeline, realAssetTouched }: Props) 
   });
 
   return (
-    <div className="w-full h-64 bg-[#0a0e17] border border-[#1f2a3d] rounded-lg overflow-hidden relative">
-      <div className="absolute top-2 left-3 z-10 flex items-center gap-4 text-xs font-semibold tracking-wide pointer-events-none">
-        <span className="text-[#4da3ff] flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-[#4da3ff]" /> TOP: DECEPTION FABRIC
+    <div className="w-full h-full bg-panel border border-line rounded-xl overflow-hidden relative shadow-inner">
+      <div className="absolute top-4 left-5 z-10 flex items-center gap-6 text-[9px] font-bold tracking-widest pointer-events-none uppercase">
+        <span className="text-mute flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-accent shadow-[0_0_8px_rgba(77,163,255,0.5)]" /> 
+          Deception Layer
         </span>
-        <span className="text-[#ff3b5c] flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-[#ff3b5c]" /> BOTTOM: REAL PRODUCTION REACH
+        <span className="text-crit flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-crit shadow-[0_0_8px_rgba(255,59,92,0.5)] animate-pulse" /> 
+          Production Breach
         </span>
       </div>
 
@@ -106,7 +108,7 @@ export default function AttackChainGraph({ timeline, realAssetTouched }: Props) 
         preventScrolling={false}
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#1f2a3d" gap={16} size={1} />
+        <Background color="#1f2a3d" gap={20} size={1} />
       </ReactFlow>
     </div>
   );

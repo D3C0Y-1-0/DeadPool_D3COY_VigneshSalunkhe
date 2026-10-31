@@ -21,35 +21,39 @@ export default function KillChainBar({ stage }: { stage: string }) {
   const currentIndex = STAGES.findIndex(([k]) => k === normStage);
 
   return (
-    <div className="w-full bg-[#111827] border border-[#1f2a3d] rounded-lg p-3">
-      <div className="flex items-center justify-between text-xs text-[#8a97ad] mb-2 px-1">
-        <span className="font-semibold uppercase tracking-wider text-[11px] text-[#4da3ff]">
+    <div className="bg-panel-card border border-line rounded-xl p-4 shadow-xl">
+      <div className="flex items-center justify-between text-xs mb-3 px-1">
+        <span className="font-bold uppercase tracking-widest text-[10px] text-mute">
           Adversary Kill Chain Progression
         </span>
-        <span>
-          Current Stage: <b className="text-[#e6edf7] uppercase font-mono">{stage ? stage.replace("_", " ") : "RECON"}</b>
+        <span className="text-mute text-[10px] uppercase">
+          Current Stage: <b className="text-ink font-mono ml-1">{stage ? stage.replace("_", " ") : "RECON"}</b>
         </span>
       </div>
-      <div className="flex gap-1.5 overflow-x-auto pb-1">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {STAGES.map(([k, label], i) => {
           const isPassed = currentIndex !== -1 && i < currentIndex;
           const isCurrent = currentIndex !== -1 && i === currentIndex;
-          const isPending = currentIndex === -1 || i > currentIndex;
 
-          let blockStyle = "border-[#1f2a3d] text-[#8a97ad] bg-[#0a0e17]/50";
+          let blockStyle = "border-line text-mute bg-panel/30";
           if (isCurrent) {
-            blockStyle = "bg-[#ff3b5c]/20 border-[#ff3b5c] text-[#ff3b5c] font-bold ring-1 ring-[#ff3b5c]/50";
+            blockStyle = "bg-crit/10 border-crit/40 text-crit font-bold shadow-[0_0_15px_rgba(255,59,92,0.1)]";
           } else if (isPassed) {
-            blockStyle = "bg-[#ff8a3d]/15 border-[#ff8a3d]/50 text-[#ff8a3d] font-medium";
+            blockStyle = "bg-high/10 border-high/40 text-high font-medium";
           }
 
           return (
             <div
               key={k}
-              className={`flex-1 min-w-[100px] rounded px-2 py-2 text-center text-xs border transition-all duration-300 ${blockStyle}`}
+              className={`flex-1 min-w-[120px] rounded-lg px-3 py-3 text-center border transition-all duration-500 ${blockStyle}`}
             >
-              <div className="text-[10px] opacity-70 mb-0.5 mono">0{i + 1}</div>
-              <div className="truncate">{label}</div>
+              <div className="text-[9px] opacity-60 mb-1 mono tracking-tighter">PHASE 0{i + 1}</div>
+              <div className="text-[11px] uppercase tracking-wider truncate">{label}</div>
+              {isCurrent && (
+                <div className="mt-2 flex justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-crit animate-ping" />
+                </div>
+              )}
             </div>
           );
         })}
