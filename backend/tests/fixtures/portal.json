@@ -1,0 +1,4 @@
+{"action": "login", "user": "admin", "password": "' OR 1=1 --", "outcome": "failure", "flags": ["sqli"], "path": "/login", "ts": "2026-10-31T10:05:00.100Z", "src_ip": "172.28.0.50", "ua": "Mozilla/5.0"}
+{"action": "login", "user": "admin", "password": "admin", "outcome": "success", "flags": [], "path": "/login", "ts": "2026-10-31T10:05:02.300Z", "src_ip": "172.28.0.50", "ua": "Mozilla/5.0"}
+{"action": "download", "path": "/download/customer_data_2026.csv", "honeytoken_id": "HT-CUST-001", "file": {"name": "customer_data_2026.csv", "size": 14200, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}, "ts": "2026-10-31T10:05:05.500Z", "src_ip": "172.28.0.50", "ua": "Mozilla/5.0"}
+{"action": "web_request", "path": "/admin-backup/", "flags": ["lure_path"], "status": 403, "ts": "2026-10-31T10:05:08.200Z", "src_ip": "172.28.0.50", "ua": "Mozilla/5.0"}

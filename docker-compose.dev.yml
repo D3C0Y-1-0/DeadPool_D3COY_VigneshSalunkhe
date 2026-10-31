@@ -1,0 +1,12 @@
+# DEV ONLY OVERRIDE: Publishes cowrie (2222) and portal (8080) ports to host.
+# NEVER USE FOR THE DEMO (Breaks isolation and opens ports externally).
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+
+services:
+  cowrie:
+    ports:
+      - "2222:2222"
+
+  portal:
+    ports:
+      - "8080:8080"

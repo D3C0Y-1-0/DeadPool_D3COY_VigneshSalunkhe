@@ -1,0 +1,4 @@
+root:x:root
+root:x:toor
+admin:x:admin123
+dbadmin:x:Passw0rd

@@ -1,0 +1,4 @@
+{"action": "connect", "src_ip": "172.28.0.50", "src_port": 49100, "dst_port": 2323, "service": "telnet", "ts": "2026-10-31T10:15:00.000Z"}
+{"action": "connect", "src_ip": "172.28.0.50", "src_port": 49101, "dst_port": 4445, "service": "smb", "ts": "2026-10-31T10:15:00.300Z"}
+{"action": "connect", "src_ip": "172.28.0.50", "src_port": 49102, "dst_port": 3390, "service": "rdp", "ts": "2026-10-31T10:15:00.600Z"}
+{"action": "connect", "src_ip": "172.28.0.50", "src_port": 49103, "dst_port": 5901, "service": "vnc", "ts": "2026-10-31T10:15:00.900Z"}

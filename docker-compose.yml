@@ -1,0 +1,159 @@
+name: mirage
+
+networks:
+  attacker_net:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24
+  prod_net:
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.29.0.0/24
+  mgmt_net: {}
+
+volumes:
+  cowrie_logs: {}
+  portal_logs: {}
+  canary_logs: {}
+  tripwire_logs: {}
+  prod_logs: {}
+  blocklist: {}
+  sim_cmd: {}
+  pgdata: {}
+
+x-hardened: &hardened
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  pids_limit: 128
+  mem_limit: 256m
+  restart: unless-stopped
+
+services:
+  cowrie:
+    <<: *hardened
+    user: "999:999"
+    build: ./honeypots/cowrie
+    hostname: db-prod-02
+    networks:
+      - attacker_net
+    volumes:
+      - cowrie_logs:/cowrie/cowrie-git/var/log/cowrie
+      - ./honeypots/cowrie/honeyfs:/app/honeyfs:ro
+
+  portal:
+    <<: *hardened
+    build: ./honeypots/portal
+    networks:
+      - attacker_net
+    volumes:
+      - portal_logs:/logs
+    tmpfs:
+      - /tmp
+
+  tripwire:
+    <<: *hardened
+    build: ./honeypots/tripwire
+    networks:
+      - attacker_net
+    volumes:
+      - tripwire_logs:/logs
+
+  opencanary:
+    build: ./honeypots/opencanary
+    networks:
+      - attacker_net
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    pids_limit: 128
+    volumes:
+      - canary_logs:/logs
+    restart: unless-stopped
+
+  prod-sim:
+    <<: *hardened
+    build: ./prod-sim
+    hostname: prod-web-01
+    networks:
+      - prod_net
+    cap_add: [NET_BIND_SERVICE]
+    volumes:
+      - prod_logs:/logs
+      - blocklist:/shared:ro
+
+  db:
+    image: postgres:16
+    env_file: .env
+    networks:
+      - mgmt_net
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: ./backend
+    env_file: .env
+    networks:
+      - mgmt_net
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - cowrie_logs:/in/cowrie:ro
+      - portal_logs:/in/portal:ro
+      - canary_logs:/in/canary:ro
+      - tripwire_logs:/in/tripwire:ro
+      - prod_logs:/in/prod:ro
+      - blocklist:/shared
+      - sim_cmd:/sim_cmd
+      - ./backend/app:/srv/app
+    restart: unless-stopped
+
+  web:
+    build: ./frontend
+    networks:
+      - mgmt_net
+    ports:
+      - "5173:80"
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/dist:/usr/share/nginx/html:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  attacker-sim:
+    build: ./sim
+    networks:
+      attacker_net:
+        ipv4_address: 172.28.0.50
+      prod_net:
+        ipv4_address: 172.29.0.50
+    volumes:
+      - sim_cmd:/sim_cmd:ro
+      - ./sim:/app
+    command: ["python", "-u", "watcher.py", "targeted"]
+    restart: unless-stopped
+
+  noise-sim:
+    build: ./sim
+    networks:
+      attacker_net:
+        ipv4_address: 172.28.0.99
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - sim_cmd:/sim_cmd:ro
+      - ./sim:/app
+    command: ["python", "-u", "watcher.py", "noise"]
+    restart: unless-stopped

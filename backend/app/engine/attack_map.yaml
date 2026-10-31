@@ -1,0 +1,213 @@
+attack_version: "v19"
+stage_order:
+  - recon
+  - credential_attack
+  - initial_access
+  - execution
+  - discovery
+  - collection
+  - exfiltration
+  - persistence
+  - lateral_movement
+  - impact
+
+techniques:
+  T1046:
+    name: Network Service Discovery
+    tactic: Discovery
+  T1595.001:
+    name: Scanning IP Blocks
+    tactic: Reconnaissance
+  T1110.001:
+    name: Password Guessing
+    tactic: Credential Access
+  T1110.004:
+    name: Credential Stuffing
+    tactic: Credential Access
+  T1078.001:
+    name: Default Accounts
+    tactic: Initial Access
+  T1078:
+    name: Valid Accounts
+    tactic: Initial Access
+  T1190:
+    name: Exploit Public-Facing Application
+    tactic: Initial Access
+  T1059.004:
+    name: Unix Shell
+    tactic: Execution
+  T1082:
+    name: System Information Discovery
+    tactic: Discovery
+  T1033:
+    name: System Owner/User Discovery
+    tactic: Discovery
+  T1083:
+    name: File and Directory Discovery
+    tactic: Discovery
+  T1057:
+    name: Process Discovery
+    tactic: Discovery
+  T1552.001:
+    name: Credentials In Files
+    tactic: Credential Access
+  T1005:
+    name: Data from Local System
+    tactic: Collection
+  T1560:
+    name: Archive Collected Data
+    tactic: Collection
+  T1105:
+    name: Ingress Tool Transfer
+    tactic: Command and Control
+  T1041:
+    name: Exfiltration Over C2 Channel
+    tactic: Exfiltration
+  T1048:
+    name: Exfiltration Over Alternative Protocol
+    tactic: Exfiltration
+  T1098.004:
+    name: SSH Authorized Keys
+    tactic: Persistence
+  T1053.003:
+    name: Cron
+    tactic: Persistence
+  T1070.003:
+    name: Clear Command History
+    tactic: Stealth
+  T1021.004:
+    name: SSH
+    tactic: Lateral Movement
+  T1496:
+    name: Resource Hijacking
+    tactic: Impact
+
+rules:
+  - id: scan
+    when: {action: scan}
+    techniques: [T1046, T1595.001]
+    stage: recon
+    category: scanning
+
+  - id: connect
+    when: {action: connect}
+    techniques: []
+    stage: recon
+    category: scanning
+
+  - id: auth_fail
+    when: {action: auth, outcome: failure}
+    techniques: [T1110.001]
+    stage: credential_attack
+    category: brute_force
+
+  - id: auth_ok
+    when: {action: auth, outcome: success}
+    techniques: [T1078.001]
+    stage: initial_access
+    category: initial_access
+
+  - id: web_exploit
+    when: {action: auth, flag_any: [sqli, traversal]}
+    techniques: [T1190]
+    stage: initial_access
+    category: exploitation
+
+  - id: shell
+    when: {action: command}
+    techniques: [T1059.004]
+    stage: execution
+    category: post_compromise
+
+  - id: sysinfo
+    when: {action: command, regex: '^\s*(uname|hostname|cat\s+/proc/(cpu|mem)info|lscpu|df)\b'}
+    techniques: [T1082]
+    stage: discovery
+    category: post_compromise
+
+  - id: whoami
+    when: {action: command, regex: '^\s*(whoami|id|w|who|last)\b'}
+    techniques: [T1033]
+    stage: discovery
+    category: post_compromise
+
+  - id: ls
+    when: {action: command, regex: '^\s*(ls|ll|dir|find|locate|tree|pwd)\b'}
+    techniques: [T1083]
+    stage: discovery
+    category: post_compromise
+
+  - id: ps
+    when: {action: command, regex: '^\s*(ps|top|netstat|ss)\b'}
+    techniques: [T1057]
+    stage: discovery
+    category: post_compromise
+
+  - id: cred_files
+    when: {action: command, regex: '(notes\.txt|\.aws/credentials|\.mysql_history|id_rsa|/etc/shadow|\.env)'}
+    techniques: [T1552.001]
+    stage: collection
+    category: post_compromise
+
+  - id: crown_jewel
+    when: {action: command, regex: '(customer_data|\.sql|\.csv|dump)'}
+    techniques: [T1005]
+    stage: collection
+    category: post_compromise
+    flag: crown_jewel
+
+  - id: archive
+    when: {action: command, regex: '\b(tar|zip|gzip|7z)\b'}
+    techniques: [T1560]
+    stage: collection
+    category: post_compromise
+
+  - id: tooldl
+    when: {action: command, regex: '\b(wget|curl|tftp|scp|sftp|ftp)\b.*(http|ftp|:)'}
+    techniques: [T1105]
+    stage: execution
+    category: post_compromise
+
+  - id: persist_ssh
+    when: {action: command, regex: 'authorized_keys'}
+    techniques: [T1098.004]
+    stage: persistence
+    category: post_compromise
+
+  - id: persist_cron
+    when: {action: command, regex: '(crontab|/etc/cron)'}
+    techniques: [T1053.003]
+    stage: persistence
+    category: post_compromise
+
+  - id: clear_hist
+    when: {action: command, regex: '(history\s+-c|unset\s+HISTFILE|rm\s+.*bash_history)'}
+    techniques: [T1070.003]
+    stage: persistence
+    category: post_compromise
+
+  - id: miner
+    when: {action: command, regex: '(xmrig|minerd|stratum\+tcp)'}
+    techniques: [T1496]
+    stage: impact
+    category: post_compromise
+
+  - id: dl_download
+    when: {action: download}
+    techniques: [T1005, T1041]
+    stage: exfiltration
+    category: exfiltration
+    flag: crown_jewel
+
+  - id: upload
+    when: {action: upload}
+    techniques: [T1105]
+    stage: execution
+    category: post_compromise
+
+  - id: token_use
+    when: {action: auth, flag_any: [honeytoken_use]}
+    techniques: [T1078, T1021.004]
+    stage: lateral_movement
+    category: lateral_movement
+    flag: honeytoken

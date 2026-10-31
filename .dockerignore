@@ -1,0 +1,10 @@
+.git
+.github
+backend/venv
+frontend/node_modules
+frontend/dist
+frontend/.next
+pgdata
+volumes
+*.pyc
+__pycache__

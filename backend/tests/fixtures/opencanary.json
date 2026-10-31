@@ -1,0 +1,2 @@
+{"dst_host": "172.28.0.25", "dst_port": 3306, "logdata": {"PASSWORD": "password123", "USERNAME": "root"}, "logtype": 8001, "node_id": "fileserv-01", "src_host": "172.28.0.50", "src_port": 51234, "utc_time": "2026-10-31 10:10:00.123"}
+{"dst_host": "172.28.0.25", "dst_port": 21, "logdata": {"PASSWORD": "anonymous", "USERNAME": "anonymous"}, "logtype": 2000, "node_id": "fileserv-01", "src_host": "172.28.0.50", "src_port": 51235, "utc_time": "2026-10-31 10:10:02.456"}

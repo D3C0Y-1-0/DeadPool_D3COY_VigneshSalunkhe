@@ -1,0 +1,5 @@
+{"eventid": "cowrie.session.connect", "format": "New connection: %(src_ip)s:%(src_port)s (%(dst_ip)s:%(dst_port)s) [session: %(session)s]", "src_ip": "172.28.0.50", "src_port": 49201, "dst_ip": "172.28.0.10", "dst_port": 2222, "session": "s9f83a210", "protocol": "ssh", "timestamp": "2026-10-31T10:00:00.123456Z"}
+{"eventid": "cowrie.login.failed", "src_ip": "172.28.0.50", "src_port": 49201, "session": "s9f83a210", "username": "admin", "password": "wrongpassword", "timestamp": "2026-10-31T10:00:01.500000Z"}
+{"eventid": "cowrie.login.success", "src_ip": "172.28.0.50", "src_port": 49201, "session": "s9f83a210", "username": "root", "password": "root", "timestamp": "2026-10-31T10:00:03.200000Z"}
+{"eventid": "cowrie.command.input", "src_ip": "172.28.0.50", "src_port": 49201, "session": "s9f83a210", "input": "cat /srv/backups/customer_data_2026.csv", "timestamp": "2026-10-31T10:00:05.100000Z"}
+{"eventid": "cowrie.client.version", "src_ip": "172.28.0.50", "src_port": 49201, "session": "s9f83a210", "version": "SSH-2.0-OpenSSH_8.9p1", "timestamp": "2026-10-31T10:00:00.200000Z"}
