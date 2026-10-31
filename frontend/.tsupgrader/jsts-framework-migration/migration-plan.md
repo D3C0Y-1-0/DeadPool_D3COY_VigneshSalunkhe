@@ -1,0 +1,33 @@
+# Vite to Next.js migration plan
+
+The source and target both live in `frontend`. This migration uses Next.js App Router and keeps the existing MIRAGE contracts, routes, API payloads, and lab-only simulator behavior.
+
+| ID | Source evidence | Target design | Dependencies | Validation | Status |
+|---|---|---|---|---|---|
+| M1 — Baseline | `package.json`, `src/`, `vite.config.ts`; standalone baseline result | Preserve the passing source evidence and comparison artifact | None | Runtime validation: typecheck, production build, home HTTP probe | Complete: 3/3 passed |
+| M2 — Next foundation | Vite config, package scripts, Tailwind Vite plugin, React 18 types | Next 16 App Router, PostCSS Tailwind integration, compatible React/graph dependencies, typed rewrites for REST, stable app scripts | M1 | Frozen package install; `tsc --noEmit`; `next build` | Pending |
+| M3 — Shared shell and live state | `src/components/Shell.tsx`, `src/useLive.ts`, `src/api.ts` | App Router layout; reference-inspired responsive MIRAGE rail/header; one shared live provider with WebSocket reconnect, explicit errors, and API refresh | M2 | Typecheck, tests, dev HTTP probe, live API/WS manual check | Pending |
+| M4 — Dashboard pages | 4 routed source pages and 11 shared components | Preserve `/`, `/incident/[id]`, `/attackers`, `/attack`, ATT&CK/export/response behavior; remove React Router-only navigation; render live backend records | M3 | Build, focused tests, probes for each route, API unavailable/error states | Pending |
+| M5 — Production deployment | Nginx static output; Compose publishes `5173:80` | Multi-stage Next standalone image, non-root runtime, Compose publishes `5173:3000`; retain `5173` host URL and mgmt network | M2 | Docker Compose config/build/start, dashboard/API/WS probes | Pending |
+| M6 — Source removal and cutover | Vite config/dependencies, old entry point and `dist` image | Remove Vite/React Router and unused Vite entry files only after Next parity passes; normal `dev`, `build`, `preview` run Next | M2-M5 | Target runtime validation; source references/CI/deployment search; backend suite | Pending |
+| M7 — Final evidence | Source and target standalone results | Write completion report, compare checks, document commands and demo flow | M1-M6 | Fresh target runtime result, Compose check, focused tests | Pending |
+
+## Contract changes
+
+| Contract | Source value | Target value | Why required | Alternatives considered | Validation evidence | Approval status |
+|---|---|---|---|---|---|---|
+| UI framework and route ownership | Vite SPA + React Router 6 | Next.js App Router | Explicit user request | Keep Vite or run both | Source baseline is green; target pending | approved change |
+| Development/start/preview commands | Vite `dev/build/preview` | Next.js `dev/build/start` (`preview` aliases `start`) | Target framework must own serving and build | Keep dual runtimes | Source baseline is green; watch/HMR and exit behavior pending | approved change |
+| Production output and image | `dist` served by Nginx | Next standalone Node server | Dynamic Next output and REST rewrite require a Node runtime | Next static export | Compose integration pending | approved change |
+| Dashboard port | Host `5173` | Host `5173` | Keep demo URL and Compose contract | Switch to 3000 | Target probes pending | preserved |
+| Node minimum | README Node 20+; no package `engines` | >=20.9 for Next.js 16 | Next 16 runtime requirement | Next 15 (supported until 2027-01-31) | Target checked on Node 22.2; minimum runtime check pending | unapproved |
+| React and graph libraries | React 18 / `reactflow` 11 | React 19 / `@xyflow/react` 12, if needed | Next 16 React requirements and compatible flow renderer | Stay on Next 15 with current libraries | Install/build/typecheck pending | approved change |
+| Data fallback behavior | Optional sample mock incident/ATT&CK values | No fabricated fallback records; show explicit empty/error UI | User requested real data | Preserve demo fixtures as displayed state | Tests and backend-linked demo pending | approved change |
+
+## Decisions and constraints
+
+- The project has no curated migration guide for Vite-to-Next.js; use the official Next.js migration guide at <https://nextjs.org/docs/app/guides/migrating/from-vite>.
+- Next.js 16 is Active LTS; Next.js 15 is Maintenance LTS through 2027-01-31 per <https://nextjs.org/support-policy>.
+- The minimum Node contract remains pending approval before declaring migration complete; do not claim support below the selected Next.js requirement.
+- The user declined browser recording in the prior interaction. Use HTTP probes and repository tests; do not install Playwright tooling or download Chromium.
+- Do not alter backend events/incident contracts, simulator routing, the decoy network boundaries, or the one-way simulator trigger.
