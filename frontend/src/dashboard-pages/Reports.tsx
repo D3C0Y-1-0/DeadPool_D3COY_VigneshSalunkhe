@@ -385,7 +385,7 @@ export default function Reports() {
 
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
       downloadPdfReport(
-        "MIRAGE Executive SOC & Threat Intelligence Report",
+        "TrapNet Executive SOC & Threat Intelligence Report",
         `Time Scope: Last ${timeRange === "all" ? "All Time" : timeRange} · ${scopedIncidents.length} Threat Chains · Generated for CISO & SOC Review`,
         `mirage-executive-report-${timestamp}`,
         sections
@@ -463,7 +463,7 @@ export default function Reports() {
         <div>
           <div className="flex items-center gap-2 text-[11px] font-mono text-[#737373] uppercase tracking-wider mb-1">
             <Radio size={12} className="text-emerald-500 animate-pulse" />
-            <span>MIRAGE SOC INTELLIGENCE · THREAT FORENSICS &amp; DECEPTION METRICS</span>
+            <span>TrapNet SOC INTELLIGENCE · THREAT FORENSICS &amp; DECEPTION METRICS</span>
           </div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-black">
             Security Intelligence &amp; Forensic Reports
@@ -1256,7 +1256,7 @@ export default function Reports() {
 
         {/* Table Footer */}
         <div className="p-3.5 px-4 border-t border-[#e5e5e5] bg-neutral-50/50 flex flex-wrap items-center justify-between gap-2 text-xs text-[#737373] font-mono">
-          <span>Showing verified live evidence from MIRAGE Core Deception Engine</span>
+          <span>Showing verified live evidence from TrapNet Core Deception Engine</span>
           <span>Updated continuously &bull; 0 false positive design</span>
         </div>
       </div>

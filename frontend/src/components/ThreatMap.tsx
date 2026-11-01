@@ -51,7 +51,7 @@ interface ThreatNode {
 const SOC_TARGET = {
   x: 504,
   y: 116,
-  label: "MIRAGE HONEYNET FABRIC",
+  label: "TrapNet HONEYNET FABRIC",
   sub: "db-prod-02 · portal · fileserv-01 · tripwire",
 };
 
@@ -670,7 +670,7 @@ export default function ThreatMap({ incidents }: Props) {
                 <g transform="translate(16, -6)">
                   <rect width="144" height="17" rx="3.5" fill="#030712" stroke="#0284c7" strokeWidth="1" opacity="0.92" />
                   <text x="6" y="11.5" fill="#38bdf8" fontSize="7.5" fontFamily="monospace" fontWeight="bold">
-                    ● MIRAGE DECOY FABRIC
+                    ● TrapNet Decoy FABRIC
                   </text>
                 </g>
               </g>

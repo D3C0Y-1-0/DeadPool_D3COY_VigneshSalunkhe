@@ -109,18 +109,24 @@ rules:
 
   - id: auth_ok
     when: {action: auth, outcome: success}
+    techniques: [T1078]
+    stage: initial_access
+    category: initial_access
+
+  - id: auth_default_account
+    when: {action: auth, outcome: success, user_any: [root, admin, administrator, guest, ubuntu, test, oracle, postgres, mysql]}
     techniques: [T1078.001]
     stage: initial_access
     category: initial_access
 
   - id: web_exploit_login
-    when: {action: auth, flag_any: [sqli, traversal]}
+    when: {action: auth, source: portal, flag_any: [sqli, traversal]}
     techniques: [T1190]
     stage: initial_access
     category: exploitation
 
   - id: web_exploit_request
-    when: {action: web_request, flag_any: [sqli, traversal]}
+    when: {action: web_request, source: portal, flag_any: [sqli, traversal]}
     techniques: [T1190]
     stage: initial_access
     category: exploitation
@@ -169,11 +175,17 @@ rules:
     category: post_compromise
 
   - id: crown_jewel
-    when: {action: command, regex: '(customer_data|\.sql|\.csv|dump)'}
+    when: {action: command, regex: '(customer_data|/srv/backups/[^ ]+\.(sql|csv)|\b(dump|backup)[_-][^ ]+\.(sql|csv))'}
     techniques: [T1005]
     stage: collection
     category: post_compromise
     flag: crown_jewel
+
+  - id: sensitive_file_access
+    when: {action: command, regex: '(?:^|\s)(?:cat|less|head|tail|more|grep|awk|sed|cp|scp)\b.*(?:/etc/shadow|/etc/passwd|\.aws/credentials|\.ssh/(?:id_rsa|id_ed25519)|\.mysql_history|(?:^|/)\.env(?:\s|$))'}
+    techniques: [T1552.001]
+    stage: collection
+    category: post_compromise
 
   - id: archive
     when: {action: command, regex: '\b(tar|zip|gzip|7z)\b'}

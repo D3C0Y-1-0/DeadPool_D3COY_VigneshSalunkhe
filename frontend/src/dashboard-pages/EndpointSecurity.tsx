@@ -265,7 +265,7 @@ export default function EndpointSecurity() {
         <div>
           <div className="flex items-center gap-2 text-[11px] font-mono text-[#737373] uppercase tracking-wider mb-0.5">
             <Radio size={12} className="text-emerald-500 animate-pulse" />
-            <span>MIRAGE SOC · DISTRIBUTED ENDPOINT TELEMETRY & EDR DECEPTION</span>
+            <span>TrapNet SOC · DISTRIBUTED ENDPOINT TELEMETRY & EDR DECEPTION</span>
           </div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-black flex items-center gap-2.5">
             <span>Remote Endpoint Fleet</span>
@@ -493,13 +493,13 @@ export default function EndpointSecurity() {
           <div className="absolute w-[360px] h-[360px] rounded-full border border-blue-500/10" />
           <div className="absolute w-[500px] h-[500px] rounded-full border border-blue-500/5" />
 
-          {/* Center Hub: Central MIRAGE Gateway */}
+          {/* Center Hub: Central TrapNet Gateway */}
           <div className="relative z-10 flex flex-col items-center">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-800 border-2 border-blue-400 shadow-[0_0_30px_rgba(37,99,235,0.4)] flex items-center justify-center text-white">
               <Shield size={28} />
             </div>
             <span className="mt-2 text-[10px] font-mono font-bold uppercase tracking-wider text-blue-300 bg-blue-950/80 px-2 py-0.5 rounded border border-blue-800">
-              MIRAGE SOC HUB
+              TrapNet SOC HUB
             </span>
           </div>
 
@@ -1167,7 +1167,7 @@ export default function EndpointSecurity() {
                   Cross-Network Lateral Movement & Honeypot Pivot Engine
                 </h3>
                 <p className="text-xs text-rose-800 mt-0.5 leading-relaxed">
-                  When an adversary probes our deception honeynet (e.g. Cowrie SSH decoy <code className="font-mono bg-rose-100 px-1 rounded">db-prod-02</code>) and subsequently attempts an intrusion on a real remote employee laptop, MIRAGE cross-references the source IP to issue a high-confidence <span className="font-bold underline">TARGETED APT alert</span> with near-zero false positive rate.
+                  When an adversary probes our deception honeynet (e.g. Cowrie SSH decoy <code className="font-mono bg-rose-100 px-1 rounded">db-prod-02</code>) and subsequently attempts an intrusion on a real remote employee laptop, TrapNet cross-references the source IP to issue a high-confidence <span className="font-bold underline">TARGETED APT alert</span> with near-zero false positive rate.
                 </p>
               </div>
             </div>

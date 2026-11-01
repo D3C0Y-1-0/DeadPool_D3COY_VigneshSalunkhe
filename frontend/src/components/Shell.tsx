@@ -86,7 +86,7 @@ export default function Shell({ children, connected, onRefresh, error }: Props) 
   const [avatarOpen, setAvatarOpen] = useState(false);
   const [spinning, setSpinning] = useState(false);
   const [lastRefresh, setLastRefresh] = useState("—");
-  const [profile, setProfile] = useState({ name: "Alex Vance", role: "Tier 1 Lead Analyst", email: "analyst@mirage.ops" });
+  const [profile, setProfile] = useState({ name: "Alex Vance", role: "Tier 1 Lead Analyst", email: "analyst@TrapNet.ops" });
   const notifRef = useRef<HTMLDivElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
   const incidentList = Object.values(incidents) as IncidentSummary[];
@@ -96,7 +96,7 @@ export default function Shell({ children, connected, onRefresh, error }: Props) 
   const openIncidentCount = incidentList.filter((incident) => incident.status === "open").length;
 
   useEffect(() => {
-    try { const s = localStorage.getItem("mirage_user"); if (s) setProfile(JSON.parse(s)); } catch { /**/ }
+    try { const s = localStorage.getItem("trapnet_user"); if (s) setProfile(JSON.parse(s)); } catch { /**/ }
   }, []);
 
   useEffect(() => {
@@ -133,10 +133,10 @@ export default function Shell({ children, connected, onRefresh, error }: Props) 
       <aside className={`sidebar${expanded ? " is-expanded" : ""}`}>
         {/* Brand */}
         <div className="sidebar-brand-row">
-          <Link href="/dashboard" className="brand-mark" aria-label="MIRAGE home">M</Link>
+          <Link href="/dashboard" className="brand-mark" aria-label="TrapNet home">T</Link>
           {expanded && (
             <div className="sidebar-brand-copy">
-              <strong>MIRAGE</strong>
+              <strong>TRAPNET</strong>
               <span>Deception SOC Platform</span>
             </div>
           )}
@@ -216,7 +216,7 @@ export default function Shell({ children, connected, onRefresh, error }: Props) 
         {/* Topbar — white, sticky */}
         <header className="topbar">
           <div className="topbar-brand">
-            <Link href="/dashboard" className="brand-mark brand-mark-small" aria-label="MIRAGE home">M</Link>
+            <Link href="/dashboard" className="brand-mark brand-mark-small" aria-label="TrapNet home">T</Link>
             <span className="brand-divider">/</span>
             <nav className="top-nav" aria-label="Primary navigation">
               {TOP_NAV.map(({ href, label }) => (

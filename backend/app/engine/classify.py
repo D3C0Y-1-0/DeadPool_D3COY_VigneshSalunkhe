@@ -39,6 +39,12 @@ def _match(when: dict, ev: dict) -> bool:
             ev_flags = set(ev.get("flags") or [])
             if not (set(v) & ev_flags):
                 return False
+        elif k == "user_any":
+            user = ev.get("user")
+            if not isinstance(user, str) or user.strip().casefold() not in {
+                candidate.casefold() for candidate in v
+            }:
+                return False
         elif ev.get(k) != v:
             return False
     return True

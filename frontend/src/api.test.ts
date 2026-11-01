@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { executeAction, fetchStats } from "./api";
 
-describe("MIRAGE dashboard API", () => {
+describe("TrapNet Dashboard API", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });

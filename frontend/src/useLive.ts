@@ -148,7 +148,7 @@ function useLiveState() {
               setError(null);
             }
           } catch (cause) {
-            console.error("Could not parse a live MIRAGE event.", cause);
+            console.error("Could not parse a live TrapNet event.", cause);
           }
         };
 

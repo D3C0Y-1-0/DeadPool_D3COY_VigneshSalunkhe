@@ -20,16 +20,18 @@
 | 9 | **Recommend** | incident → actions | Rule table |
 | 10 | **Export** | incident → STIX / CSV / blocklist / ECS | Intel loop |
 
+The event rulebook currently contains **25 YAML rules** mapped to **25 ATT&CK technique definitions**. Behavioral indicators are deterministic, evidence-only signals (zero score points), except the existing scoring modifiers documented below. This is not a trained AI/ML model; there is no labeled training set or validated model in this project.
+
 ## 3. Classification taxonomy
 
 | Category | Typical signals | Example ATT&CK |
 |---|---|---|
 | `scanning` | multi-port connects, tripwire hits | T1046, T1595.001 |
-| `brute_force` | repeated failed auth | T1110.001 (guessing); correlated password spray maps to T1110.003 after ≥5 failures across ≥3 distinct usernames |
-| `initial_access` | successful auth with default creds | T1078.001 |
+| `brute_force` | failed auth event and time-bounded repeated attempts | T1110.001 (guessing); correlated password spray maps to T1110.003 after ≥5 failures across ≥3 usernames in 5 minutes |
+| `initial_access` | successful auth | T1078 (valid accounts); known default account names additionally map to T1078.001 |
 | `exploitation` | SQLi / traversal flags on portal login or web-request events | T1190 |
 | `scanning` | request to the planted `/admin-backup/` lure | T1595.003; `targeted_lure` flag |
-| `post_compromise` | shell commands, discovery, collection, tool download | T1059.004, T1083, T1082, T1033, T1005, T1105, T1552.001 |
+| `post_compromise` | shell commands, discovery, collection, tool download, sensitive credential-file reads | T1059.004, T1083, T1082, T1033, T1005, T1105, T1552.001 |
 | `exfiltration` | decoy file download, crown-jewel read | T1005 + T1041 |
 | `persistence` | authorized_keys, cron, history clearing | T1098.004, T1053.003, T1070.003 |
 | `lateral_movement` | honeytoken used on real host | T1078, T1021.004 |
@@ -151,7 +153,10 @@ The `/admin-backup/` lure is a recon signal only; it does not by itself prove ex
 | (extension) VPN/IdP logs | user ↔ IP map |
 
 ### 6.5 Correlated password spraying
-The evaluator adds ATT&CK `T1110.003` when one source IP produces at least **5 failed deception auth events** across at least **3 distinct non-empty usernames** in the existing 30-minute correlation window. The incident includes a zero-point factor to explain the classification. This signal does not add a new scoring modifier or alter the frozen incident schema. Credential stuffing (`T1110.004`) is not inferred from username/password variation alone because the engine has no evidence those credentials were previously exposed.
+The evaluator adds ATT&CK `T1110.003` when one source IP produces at least **5 failed deception auth events** across at least **3 distinct non-empty usernames within 5 minutes**. The incident includes a zero-point factor to explain the classification. This signal does not add a new scoring modifier or alter the frozen incident schema. Credential stuffing (`T1110.004`) is not inferred from username/password variation alone because the engine has no evidence those credentials were previously exposed.
+
+### 6.6 Behavioral evidence indicators
+The evaluator adds zero-point explanatory factors for **8 failed authentications in 60 seconds**, **5 commands in 10 seconds within a sensor/session group**, sensitive-decoy access, file transfers of at least **10 MiB**, and ordered multi-step activity within a known session. These signals explain patterns; they do not independently increase risk or force an ATT&CK technique. Successful authentication is mapped to generic `T1078`; only recognized default-account usernames also receive `T1078.001`. A generic `.csv` or `.sql` command is not sufficient to label data crown-jewel; the rule requires known customer/backups naming and path patterns.
 
 ## 7. Attacker profile (what the analyst sees)
 
@@ -168,7 +173,7 @@ The evaluator adds ATT&CK `T1110.003` when one source IP produces at least **5 f
 
 **Cadence algorithm:** classify the most recent session with at least 3 commands; command timestamps are never mixed across known session IDs. If a session ID is unavailable, commands are grouped by sensor and split after a 10-minute idle gap. `median gap < 0.6s → bot`; `median ≥ 1.5s and coefficient of variation ≥ 0.3 → human`; otherwise `scripted`.
 
-The engine performs deterministic rule-based classification and scoring, not trained-ML forecasting. It describes observed behavior; a future-stage prediction would require a separately agreed incident/API contract and should not be presented as a verified outcome.
+The engine performs deterministic rule-based classification and scoring, not trained-ML forecasting. It describes observed behavior; a future-stage prediction would require a separately agreed incident/API contract and should not be presented as a verified outcome. No external threat-intelligence feed is integrated: ATT&CK mappings and locally observed indicators (such as source IP, file hashes, and SSH fingerprints) are not reputation verdicts.
 
 ## 8. Noise reduction accounting (live KPI)
 ```

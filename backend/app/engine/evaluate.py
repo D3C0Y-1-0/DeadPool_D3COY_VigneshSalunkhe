@@ -26,6 +26,121 @@ def _parse_ts(s: str) -> dt.datetime:
     clean = s.replace("Z", "+00:00")
     return dt.datetime.fromisoformat(clean)
 
+def _timed_events(events: list[dict]) -> list[tuple[dt.datetime, dict]]:
+    timed = []
+    for event in events:
+        timestamp = event.get("ts")
+        if not isinstance(timestamp, str):
+            continue
+        try:
+            parsed = _parse_ts(timestamp)
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=dt.timezone.utc)
+            else:
+                parsed = parsed.astimezone(dt.timezone.utc)
+            timed.append((parsed, event))
+        except ValueError:
+            continue
+    return sorted(timed, key=lambda item: item[0])
+
+def _has_window_threshold(
+    events: list[dict],
+    threshold: int,
+    seconds: int,
+    distinct_field: Optional[str] = None,
+    distinct_minimum: int = 1
+) -> bool:
+    timed = _timed_events(events)
+    left = 0
+    for right, (end, _) in enumerate(timed):
+        while (end - timed[left][0]).total_seconds() > seconds:
+            left += 1
+        window = timed[left:right + 1]
+        if len(window) < threshold:
+            continue
+        if distinct_field is None:
+            return True
+        values = {
+            item.get(distinct_field, "").strip().casefold()
+            for _, item in window
+            if isinstance(item.get(distinct_field), str) and item.get(distinct_field, "").strip()
+        }
+        if len(values) >= distinct_minimum:
+            return True
+    return False
+
+def _session_events(events: list[dict]) -> list[list[dict]]:
+    groups = {}
+    for event in events:
+        session_id = event.get("session_id")
+        if not session_id:
+            continue
+        key = (event.get("source"), event.get("sensor"), session_id)
+        groups.setdefault(key, []).append(event)
+    return [
+        [event for _, event in _timed_events(group)]
+        for group in groups.values()
+    ]
+
+def _behavioral_signals(events: list[dict]) -> tuple[list[str], bool]:
+    failed_auth = [
+        event for event in events
+        if event.get("action") == "auth" and event.get("outcome") == "failure"
+    ]
+    spray = _has_window_threshold(failed_auth, 5, 300, "user", distinct_minimum=3)
+    signals = []
+    if spray:
+        signals.append("Password spray pattern: >=5 failed logins across >=3 usernames in 5 minutes")
+
+    if _has_window_threshold(failed_auth, 8, 60):
+        signals.append("Rapid authentication burst: >=8 failed logins in 60 seconds")
+
+    commands_by_sensor = {}
+    for event in events:
+        if event.get("action") != "command":
+            continue
+        group_key = (
+            event.get("sensor") or event.get("source") or "unknown",
+            event.get("session_id") or "unscoped"
+        )
+        commands_by_sensor.setdefault(group_key, []).append(event)
+    if any(_has_window_threshold(group, 5, 10) for group in commands_by_sensor.values()):
+        signals.append("Rapid command burst: >=5 commands in 10 seconds within one session/sensor")
+
+    if any("crown_jewel" in (event.get("flags") or []) for event in events):
+        signals.append("Sensitive decoy data access observed")
+
+    large_transfer = any(
+        event.get("action") in ("download", "upload")
+        and isinstance((event.get("file") or {}).get("size"), int)
+        and (event.get("file") or {}).get("size") >= 10 * 1024 * 1024
+        for event in events
+    )
+    if large_transfer:
+        signals.append("Large file transfer observed: >=10 MiB")
+
+    for group in _session_events(events):
+        authenticated = False
+        earlier_stages = set()
+        advanced = False
+        for event in group:
+            if event.get("action") == "auth" and event.get("outcome") == "success":
+                authenticated = True
+            elif authenticated and event.get("action") in ("command", "download", "upload"):
+                advanced = True
+
+            stage = event.get("stage")
+            if stage in ORDER:
+                stage_index = ORDER.index(stage)
+                if any(previous < stage_index for previous in earlier_stages):
+                    advanced = True
+                earlier_stages.add(stage_index)
+
+        if advanced:
+            signals.append("Ordered multi-step activity observed within a session")
+            break
+    return signals, spray
+
 def cadence(cmd_events: list[dict]) -> tuple[str, Optional[float]]:
     if not cmd_events or len(cmd_events) < 3:
         return "unknown", None
@@ -150,16 +265,7 @@ def evaluate(src_ip: str, events: list[dict]) -> dict:
     max_stage = max(stages, key=ORDER.index) if stages else "recon"
 
     techs = sorted({t for e in all_ev for t in e.get("techniques", [])})
-    failed_auth = [
-        e for e in dec
-        if e.get("action") == "auth" and e.get("outcome") == "failure"
-    ]
-    distinct_failed_users = {
-        e.get("user", "").strip().lower()
-        for e in failed_auth
-        if isinstance(e.get("user"), str) and e.get("user", "").strip()
-    }
-    password_spray = len(failed_auth) >= 5 and len(distinct_failed_users) >= 3
+    behavior_signals, password_spray = _behavioral_signals(dec)
     if password_spray:
         techs = sorted(set(techs) | {"T1110.003"})
     flags = Counter(f for e in all_ev for f in e.get("flags", []))
@@ -181,11 +287,7 @@ def evaluate(src_ip: str, events: list[dict]) -> dict:
         duration = 0.0
 
     factors = [dict(label=f"Stage reached: {max_stage}", points=STAGE_POINTS.get(max_stage, 10))]
-    if password_spray:
-        factors.append(dict(
-            label="Password spray pattern: >=5 failed logins across >=3 usernames",
-            points=0
-        ))
+    factors.extend(dict(label=signal, points=0) for signal in behavior_signals)
     tgt = 0
     noise = 0
 

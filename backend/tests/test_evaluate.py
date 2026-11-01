@@ -244,6 +244,25 @@ def test_password_spray_correlation():
     assert any("Password spray pattern" in factor["label"] for factor in incident["factors"])
     assert next(f["points"] for f in incident["factors"] if "Password spray pattern" in f["label"]) == 0
 
+def test_password_spray_requires_events_within_five_minutes():
+    events = [
+        {
+            "ts": f"2026-10-31T10:{i * 6:02d}:00Z",
+            "source": "cowrie",
+            "sensor": "db-prod-02",
+            "zone": "deception",
+            "src_ip": "203.0.113.74",
+            "action": "auth",
+            "outcome": "failure",
+            "user": f"user{i}",
+            "stage": "credential_attack",
+            "techniques": ["T1110.001"]
+        }
+        for i in range(5)
+    ]
+    incident = evaluate("203.0.113.74", events)
+    assert "T1110.003" not in {tech["id"] for tech in incident["techniques"]}
+
 def test_password_spray_requires_five_failures_and_three_users():
     events = [
         {
@@ -262,6 +281,88 @@ def test_password_spray_requires_five_failures_and_three_users():
     ]
     incident = evaluate("203.0.113.71", events)
     assert "T1110.003" not in {tech["id"] for tech in incident["techniques"]}
+
+def test_behavior_signals_explain_sequences_and_large_transfers_without_changing_score():
+    events = [
+        {
+            "ts": "2026-10-31T10:00:00Z",
+            "source": "cowrie",
+            "sensor": "db-prod-02",
+            "zone": "deception",
+            "session_id": "sequence-1",
+            "src_ip": "203.0.113.75",
+            "action": "auth",
+            "outcome": "success",
+            "stage": "initial_access",
+            "techniques": ["T1078"]
+        },
+        {
+            "ts": "2026-10-31T10:00:01Z",
+            "source": "cowrie",
+            "sensor": "db-prod-02",
+            "zone": "deception",
+            "session_id": "sequence-1",
+            "src_ip": "203.0.113.75",
+            "action": "command",
+            "cmd": "cat /srv/backups/customer_data.csv",
+            "stage": "collection",
+            "techniques": ["T1005"],
+            "flags": ["crown_jewel"]
+        },
+        {
+            "ts": "2026-10-31T10:00:02Z",
+            "source": "cowrie",
+            "sensor": "db-prod-02",
+            "zone": "deception",
+            "session_id": "sequence-1",
+            "src_ip": "203.0.113.75",
+            "action": "download",
+            "stage": "exfiltration",
+            "techniques": ["T1041"],
+            "file": {"name": "archive.bin", "size": 10 * 1024 * 1024}
+        }
+    ]
+    incident = evaluate("203.0.113.75", events)
+    labels = [factor["label"] for factor in incident["factors"]]
+    assert any("Sensitive decoy data access" in label for label in labels)
+    assert any("Large file transfer" in label for label in labels)
+    assert any("Ordered multi-step activity" in label for label in labels)
+    assert incident["score"] == 95
+    assert all(
+        factor["points"] == 0
+        for factor in incident["factors"]
+        if factor["label"] not in (
+            "Stage reached: exfiltration",
+            "Accessed crown-jewel decoy data"
+        )
+    )
+
+def test_auth_burst_indicator_is_time_bounded_and_zero_point():
+    base = {
+        "source": "cowrie",
+        "sensor": "db-prod-02",
+        "zone": "deception",
+        "src_ip": "203.0.113.76",
+        "action": "auth",
+        "outcome": "failure",
+        "user": "root",
+        "stage": "credential_attack",
+        "techniques": ["T1110.001"]
+    }
+    rapid = [
+        {**base, "ts": f"2026-10-31T10:00:{i:02d}Z"}
+        for i in range(8)
+    ]
+    incident = evaluate("203.0.113.76", rapid)
+    burst = next(f for f in incident["factors"] if "Rapid authentication burst" in f["label"])
+    assert burst["points"] == 0
+
+    slow = [
+        {**base, "ts": f"2026-10-31T10:{i:02d}:00Z"}
+        for i in range(8)
+    ]
+    slow_incident = evaluate("203.0.113.76", slow)
+    assert not any("Rapid authentication burst" in f["label"] for f in slow_incident["factors"])
 
 def test_evaluate_ignores_events_from_other_source_ips():
     events = [{

@@ -46,7 +46,7 @@ export function downloadPdfReport(
     pdf.setTextColor(255, 255, 255);
     pdf.setFont("helvetica", "bold");
     pdf.setFontSize(8);
-    pdf.text("MIRAGE  /  SOC INTELLIGENCE", margin, 9);
+    pdf.text("TrapNet  /  SOC INTELLIGENCE", margin, 9);
     pdf.setTextColor(102, 112, 133);
     pdf.setDrawColor(220, 224, 231);
     pdf.line(margin, 17, pageWidth - margin, 17);
@@ -72,7 +72,7 @@ export function downloadPdfReport(
   pdf.text(subtitleLines, margin, y);
   y += subtitleLines.length * 4.5 + 2;
   pdf.setFontSize(8);
-  pdf.text(`Generated ${new Date().toISOString()} · Evidence source: MIRAGE API`, margin, y);
+  pdf.text(`Generated ${new Date().toISOString()} · Evidence source: TrapNet API`, margin, y);
   y += 9;
 
   sections.forEach((section) => {
@@ -120,7 +120,7 @@ export function downloadPdfReport(
     pdf.setTextColor(115, 123, 138);
     pdf.setFont("helvetica", "normal");
     pdf.setFontSize(7);
-    pdf.text("MIRAGE deception-lab telemetry · Synthetic environment", margin, pageHeight - 8);
+    pdf.text("TrapNet deception-lab telemetry · Synthetic environment", margin, pageHeight - 8);
     pdf.text(`Page ${page} of ${pageCount}`, pageWidth - margin, pageHeight - 8, { align: "right" });
   }
 
@@ -153,7 +153,7 @@ export function downloadIncidentPdf(incident: Incident) {
 
   downloadPdfReport(
     `Attacker investigation: ${incident.src_ip}`,
-    `${incident.id} · ${incident.severity.toUpperCase()} · ${incident.verdict.toUpperCase()} · MIRAGE incident evidence`,
+    `${incident.id} · ${incident.severity.toUpperCase()} · ${incident.verdict.toUpperCase()} · TrapNet incident evidence`,
     `mirage-${incident.id}-attacker-report`,
     [
       {

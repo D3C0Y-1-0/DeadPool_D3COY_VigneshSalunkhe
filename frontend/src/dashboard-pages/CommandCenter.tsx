@@ -58,7 +58,7 @@ export default function CommandCenter() {
         <div>
           <div className="flex items-center gap-2 text-[11px] font-mono text-[#737373] uppercase tracking-wider mb-0.5">
             <Radio size={12} className="text-emerald-500 animate-pulse" />
-            <span>MIRAGE SOC · DECEPTION-DRIVEN DETECTION & ACTIVE CONTAINMENT</span>
+            <span>TRAPNET · DECEPTION-DRIVEN DETECTION & ACTIVE CONTAINMENT</span>
           </div>
           <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-black">
             SOC Analyst Command Center

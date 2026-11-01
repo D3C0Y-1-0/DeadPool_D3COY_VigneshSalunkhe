@@ -267,7 +267,7 @@ const AGENT_ADMIN_TOKEN =
 
 function agentAdminHeaders(extra?: Record<string, string>): Record<string, string> {
   return {
-    "X-MIRAGE-Admin-Token": AGENT_ADMIN_TOKEN,
+    "X-TrapNet-Admin-Token": AGENT_ADMIN_TOKEN,
     ...extra,
   };
 }

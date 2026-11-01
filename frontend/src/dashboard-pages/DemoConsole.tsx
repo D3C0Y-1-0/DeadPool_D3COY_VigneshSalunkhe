@@ -55,7 +55,7 @@ export default function DemoConsole() {
         <div>
           <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", marginBottom: 4 }}>Simulation</div>
           <h1 style={{ margin: 0, fontSize: "1.8rem", fontWeight: 800, letterSpacing: "-0.03em" }}>Demo Console</h1>
-          <p style={{ margin: "0.3rem 0 0", fontSize: "0.82rem", color: "var(--color-mute)" }}>Trigger synthetic attack scenarios to demonstrate MIRAGE detection capabilities</p>
+          <p style={{ margin: "0.3rem 0 0", fontSize: "0.82rem", color: "var(--color-mute)" }}>Trigger synthetic attack scenarios to demonstrate TrapNet detection capabilities</p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {status && (
@@ -138,7 +138,7 @@ export default function DemoConsole() {
           </div>
           <h2 style={{ margin: "0 0 0.5rem", fontSize: "1.1rem", fontWeight: 800, color: "var(--color-ink)" }}>Opportunistic Noise</h2>
           <p style={{ margin: "0 0 1.25rem", fontSize: "0.82rem", color: "var(--color-mute)", lineHeight: 1.6 }}>
-            Simulates mass internet background noise: automated scanners, credential-stuffing bots with common wordlists. Demonstrates MIRAGE's noise suppression and opportunistic classification.
+            Simulates mass internet background noise: automated scanners, credential-stuffing bots with common wordlists. Demonstrates TrapNet's noise suppression and opportunistic classification.
           </p>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: "1rem" }}>
             {["Automated Scanners","Credential Stuffing","Multi-Sensor","Noise Suppression","LOW/MEDIUM Incidents"].map((tag) => (

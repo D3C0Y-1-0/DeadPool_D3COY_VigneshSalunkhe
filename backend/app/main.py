@@ -2,7 +2,11 @@ import asyncio
 import json
 import uuid
 import os
+import logging
 import datetime as dt
+
+logging.getLogger("websockets").setLevel(logging.DEBUG)
+logging.getLogger("uvicorn.error").setLevel(logging.DEBUG)
 from collections import defaultdict
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,9 +30,9 @@ from .api import (
 )
 
 app = FastAPI(
-    title="MIRAGE SOC API",
-    version="1.0.0",
-    description="Deception-Driven Threat Detection & Active Containment SOC Platform"
+    title="TrapNet SOC API",
+    version="2.0.0",
+    description="TrapNet — Deception-Driven Threat Detection & Active Containment SOC Platform"
 )
 
 # CORS enabled for hackathon lab dashboard frontend

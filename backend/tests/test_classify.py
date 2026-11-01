@@ -3,7 +3,7 @@ from app.engine.classify import classify, TECH, ORDER, RULES
 
 def test_attack_map_integrity():
     assert len(TECH) >= 20
-    assert len(RULES) == 23
+    assert len(RULES) == 25
     assert len(ORDER) == 10
     assert "recon" in ORDER
     assert "lateral_movement" in ORDER
@@ -34,7 +34,7 @@ def test_attack_map_integrity():
         "T1110.001", "credential_attack", None
     ),
     (
-        {"action": "auth", "outcome": "success"},
+        {"action": "auth", "outcome": "success", "user": "root"},
         "T1078.001", "initial_access", None
     ),
     (
@@ -42,16 +42,24 @@ def test_attack_map_integrity():
         "T1021.004", "lateral_movement", "honeytoken"
     ),
     (
-        {"action": "auth", "outcome": "failure", "flags": ["sqli"]},
+        {"action": "auth", "source": "portal", "outcome": "failure", "flags": ["sqli"]},
         "T1190", "initial_access", None
     ),
     (
-        {"action": "web_request", "flags": ["traversal"], "cmd": "/../../etc/passwd"},
+        {"action": "web_request", "source": "portal", "flags": ["traversal"], "cmd": "/../../etc/passwd"},
         "T1190", "initial_access", None
     ),
     (
         {"action": "web_request", "cmd": "/admin-backup/"},
         "T1595.003", "recon", "targeted_lure"
+    ),
+    (
+        {"action": "auth", "outcome": "success", "user": "service-account"},
+        "T1078", "initial_access", None
+    ),
+    (
+        {"action": "command", "cmd": "cat /home/user/.ssh/id_rsa"},
+        "T1552.001", "collection", None
     ),
     (
         {"action": "command", "cmd": "foobar_random_binary"},
@@ -74,3 +82,12 @@ def test_admin_lure_rule_does_not_match_unrelated_paths():
     classified = classify({"action": "web_request", "cmd": "/admin/"})
     assert "T1595.003" not in classified["techniques"]
     assert "targeted_lure" not in classified["flags"]
+
+def test_ordinary_csv_is_not_assumed_to_be_crown_jewel_data():
+    classified = classify({"action": "command", "cmd": "cat /tmp/public_report.csv"})
+    assert "T1005" not in classified["techniques"]
+    assert "crown_jewel" not in classified["flags"]
+
+def test_default_account_matching_is_case_insensitive():
+    classified = classify({"action": "auth", "outcome": "success", "user": "ROOT"})
+    assert "T1078.001" in classified["techniques"]

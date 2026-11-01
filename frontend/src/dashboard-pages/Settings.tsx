@@ -8,19 +8,19 @@ const TABS = ["General", "Security", "Notifications", "Integrations"] as const;
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<typeof TABS[number]>("General");
   const [saved, setSaved] = useState(false);
-  const [profile, setProfile] = useState({ name: "Alex Vance", role: "Tier 1 Lead Analyst", email: "analyst@mirage.ops" });
-  const [platform, setPlatform] = useState({ name: "MIRAGE", timezone: "UTC+05:30", retention: "30" });
+  const [profile, setProfile] = useState({ name: "Alex Vance", role: "Tier 1 Lead Analyst", email: "analyst@TrapNet.ops" });
+  const [platform, setPlatform] = useState({ name: "TrapNet", timezone: "UTC+05:30", retention: "30" });
   const [notifications, setNotifications] = useState({ critical: true, high: true, medium: false, low: false, webhook: "" });
 
   useEffect(() => {
     try {
-      const s = localStorage.getItem("mirage_user");
+      const s = localStorage.getItem("trapnet_user");
       if (s) setProfile(JSON.parse(s));
     } catch { /* ignore */ }
   }, []);
 
   const handleSave = () => {
-    try { localStorage.setItem("mirage_user", JSON.stringify(profile)); } catch { /* ignore */ }
+    try { localStorage.setItem("trapnet_user", JSON.stringify(profile)); } catch { /* ignore */ }
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
   };
@@ -37,7 +37,7 @@ export default function SettingsPage() {
       <div>
         <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", marginBottom: 4 }}>Configuration</div>
         <h1 style={{ margin: 0, fontSize: "1.8rem", fontWeight: 800, letterSpacing: "-0.03em" }}>Settings</h1>
-        <p style={{ margin: "0.3rem 0 0", fontSize: "0.82rem", color: "var(--color-mute)" }}>Configure your MIRAGE SOC Platform preferences</p>
+        <p style={{ margin: "0.3rem 0 0", fontSize: "0.82rem", color: "var(--color-mute)" }}>Configure your TrapNet SOC Platform preferences</p>
       </div>
 
       {saved && (
