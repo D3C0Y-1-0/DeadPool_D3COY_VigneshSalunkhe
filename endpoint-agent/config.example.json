@@ -1,0 +1,8 @@
+{
+  "backend_url": "https://mirage-vpn.example",
+  "queue_path": "state/mirage-agent.sqlite",
+  "poll_interval_seconds": 15,
+  "heartbeat_interval_seconds": 60,
+  "batch_size": 100,
+  "request_timeout_seconds": 15
+}

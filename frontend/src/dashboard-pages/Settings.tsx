@@ -1,181 +1,168 @@
 "use client";
 
-import { useLive } from "../useLive";
-import { Check, Cpu, Network, ShieldCheck, Sliders } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { CheckCircle, Globe, Save, Settings, Shield, User } from "lucide-react";
 
-const STAGE_BASE_POINTS: Array<{ stage: string; points: number }> = [
-  { stage: "recon", points: 10 },
-  { stage: "credential_attack", points: 25 },
-  { stage: "initial_access", points: 45 },
-  { stage: "execution", points: 50 },
-  { stage: "discovery", points: 60 },
-  { stage: "collection", points: 75 },
-  { stage: "exfiltration", points: 85 },
-  { stage: "persistence", points: 85 },
-  { stage: "lateral_movement", points: 90 },
-  { stage: "impact", points: 80 }
-];
+const TABS = ["General", "Security", "Notifications", "Integrations"] as const;
 
-const MODIFIERS: Array<{ label: string; points: number }> = [
-  { label: "Human cadence", points: 10 },
-  { label: "Two or more decoys", points: 10 },
-  { label: "Crown-jewel access", points: 10 },
-  { label: "Real asset touched", points: 25 },
-  { label: "Honeytoken use", points: 30 },
-  { label: "Return visit", points: 5 },
-  { label: "Wordlist-only", points: -15 },
-  { label: "Machine cadence", points: -10 },
-  { label: "Drive-by", points: -10 }
-];
+export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState<typeof TABS[number]>("General");
+  const [saved, setSaved] = useState(false);
+  const [profile, setProfile] = useState({ name: "Alex Vance", role: "Tier 1 Lead Analyst", email: "analyst@mirage.ops" });
+  const [platform, setPlatform] = useState({ name: "MIRAGE", timezone: "UTC+05:30", retention: "30" });
+  const [notifications, setNotifications] = useState({ critical: true, high: true, medium: false, low: false, webhook: "" });
 
-const THRESHOLDS: Array<{ range: string; severity: string; color: string }> = [
-  { range: "≥ 85", severity: "critical", color: "text-rose-600" },
-  { range: "60 – 84", severity: "high", color: "text-orange-600" },
-  { range: "30 – 59", severity: "medium", color: "text-amber-600" },
-  { range: "< 30", severity: "low", color: "text-emerald-600" }
-];
+  useEffect(() => {
+    try {
+      const s = localStorage.getItem("mirage_user");
+      if (s) setProfile(JSON.parse(s));
+    } catch { /* ignore */ }
+  }, []);
 
-const SAFETY_GUARANTEES: string[] = [
-  "Decoy services run only on the internal attacker_net network — no routable exposure.",
-  "All compose networks are marked internal with no internet egress.",
-  "Honeypot containers run with cap_drop ALL, no-new-privileges and memory/PID limits.",
-  "Attacker-supplied commands and files are never executed.",
-  "All telemetry and credentials are synthetic; bait domains use the reserved .example TLD."
-];
+  const handleSave = () => {
+    try { localStorage.setItem("mirage_user", JSON.stringify(profile)); } catch { /* ignore */ }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2500);
+  };
 
-export default function Settings() {
-  const { connected } = useLive();
+  const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+    <div>
+      <label style={{ display: "block", fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--color-mute)", marginBottom: 6 }}>{label}</label>
+      {children}
+    </div>
+  );
 
   return (
-    <div className="page-content space-y-6">
-      <section className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <div className="text-[10px] font-bold text-accent uppercase tracking-widest mb-1">Platform</div>
-          <h1 className="text-3xl font-bold text-ink tracking-tight">Platform Settings</h1>
-          <p className="text-sm text-mute mt-1">Read-only reference for MIRAGE safety guarantees, scoring model and network isolation.</p>
-        </div>
-        <div className="bg-panel-card border border-line rounded-lg px-4 py-2 flex items-center gap-2">
-          <Sliders size={14} className="text-mute" />
-          <span className="text-[10px] font-bold text-mute uppercase tracking-widest">Read-Only Mode</span>
-        </div>
-      </section>
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+      <div>
+        <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", marginBottom: 4 }}>Configuration</div>
+        <h1 style={{ margin: 0, fontSize: "1.8rem", fontWeight: 800, letterSpacing: "-0.03em" }}>Settings</h1>
+        <p style={{ margin: "0.3rem 0 0", fontSize: "0.82rem", color: "var(--color-mute)" }}>Configure your MIRAGE SOC Platform preferences</p>
+      </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        <section className="bg-panel-card border border-line rounded-xl p-6 shadow-xl">
-          <div className="flex items-center justify-between mb-6 pb-2 border-b border-line">
-            <h2 className="text-[10px] font-bold text-mute uppercase tracking-widest">Safety Guarantees</h2>
-            <ShieldCheck size={18} className="text-low" />
-          </div>
-          <ul className="space-y-4">
-            {SAFETY_GUARANTEES.map((item) => (
-              <li key={item} className="flex items-start gap-3 text-[12px] text-mute group">
-                <div className="mt-1 p-0.5 bg-low/10 rounded-full">
-                  <Check size={12} className="text-low" />
-                </div>
-                <span className="group-hover:text-ink transition-colors leading-relaxed">{item}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
+      {saved && (
+        <div className="notice notice-success"><CheckCircle size={14} style={{ flexShrink: 0 }} /> Settings saved successfully.</div>
+      )}
 
-        <section className="bg-panel-card border border-line rounded-xl p-6 shadow-xl">
-          <div className="flex items-center justify-between mb-6 pb-2 border-b border-line">
-            <h2 className="text-[10px] font-bold text-mute uppercase tracking-widest">Scoring Engine Policy</h2>
-            <Cpu size={18} className="text-accent" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 className="text-[10px] font-bold text-ink uppercase tracking-widest mb-3 opacity-70">Stage Base Points</h4>
-              <div className="space-y-2">
-                {STAGE_BASE_POINTS.map((row) => (
-                  <div key={row.stage} className="flex items-center justify-between text-[11px] py-1 border-b border-line/50">
-                    <span className="mono uppercase text-mute">{row.stage.replace('_', ' ')}</span>
-                    <span className="mono font-bold text-ink">{row.points}</span>
+      <div style={{ display: "grid", gridTemplateColumns: "200px 1fr", gap: "1.5rem", alignItems: "start" }}>
+        {/* Sidebar */}
+        <div className="card" style={{ padding: "0.75rem" }}>
+          {TABS.map((tab) => (
+            <button key={tab} onClick={() => setActiveTab(tab)}
+              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "0.6rem 0.75rem", borderRadius: 9, fontSize: "0.78rem", fontWeight: activeTab === tab ? 700 : 500, color: activeTab === tab ? "var(--color-accent)" : "var(--color-mute)", background: activeTab === tab ? "rgba(59,130,246,0.1)" : "transparent", border: activeTab === tab ? "1px solid rgba(59,130,246,0.25)" : "1px solid transparent", marginBottom: 2, cursor: "pointer", textAlign: "left" }}>
+              {tab === "General" ? <Settings size={14} /> : tab === "Security" ? <Shield size={14} /> : tab === "Notifications" ? <Shield size={14} /> : <Globe size={14} />}
+              {tab}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="card" style={{ padding: "1.5rem" }}>
+          {activeTab === "General" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "var(--color-ink)" }}>Analyst Profile</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+                <Field label="Display Name">
+                  <input className="input" value={profile.name} onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))} />
+                </Field>
+                <Field label="Role / Tier">
+                  <input className="input" value={profile.role} onChange={(e) => setProfile((p) => ({ ...p, role: e.target.value }))} />
+                </Field>
+                <Field label="Email Address">
+                  <input className="input" type="email" value={profile.email} onChange={(e) => setProfile((p) => ({ ...p, email: e.target.value }))} />
+                </Field>
+              </div>
+              <div style={{ height: 1, background: "var(--color-line)" }} />
+              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "var(--color-ink)" }}>Platform Settings</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "1rem" }}>
+                <Field label="Platform Name">
+                  <input className="input" value={platform.name} onChange={(e) => setPlatform((p) => ({ ...p, name: e.target.value }))} />
+                </Field>
+                <Field label="Timezone">
+                  <select className="select-input" value={platform.timezone} onChange={(e) => setPlatform((p) => ({ ...p, timezone: e.target.value }))}>
+                    {["UTC", "UTC+05:30", "UTC+08:00", "UTC-05:00", "UTC-08:00"].map((tz) => <option key={tz} value={tz}>{tz}</option>)}
+                  </select>
+                </Field>
+                <Field label="Log Retention (days)">
+                  <select className="select-input" value={platform.retention} onChange={(e) => setPlatform((p) => ({ ...p, retention: e.target.value }))}>
+                    {["7","14","30","60","90","180","365"].map((d) => <option key={d} value={d}>{d} days</option>)}
+                  </select>
+                </Field>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "Security" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "var(--color-ink)" }}>Security Policies</h3>
+              {[
+                { label: "Require MFA for critical action approvals", checked: true },
+                { label: "Enable audit logging for all analyst actions", checked: true },
+                { label: "Auto-contain on critical severity incidents", checked: false },
+                { label: "Block list sync with production firewall", checked: true },
+                { label: "Honeytoken alert escalation to email", checked: false },
+              ].map((item, i) => (
+                <label key={i} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "0.65rem 0.85rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--color-line)", borderRadius: 9 }}>
+                  <input type="checkbox" defaultChecked={item.checked} style={{ width: 15, height: 15, accentColor: "var(--color-accent)" }} />
+                  <span style={{ fontSize: "0.78rem", color: "var(--color-ink)" }}>{item.label}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {activeTab === "Notifications" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "var(--color-ink)" }}>Alert Thresholds</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {(["critical","high","medium","low"] as const).map((sev) => {
+                  const colors: Record<string,string> = { critical: "#f43f5e", high: "#f97316", medium: "#eab308", low: "#22c55e" };
+                  return (
+                    <label key={sev} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", padding: "0.65rem 0.85rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--color-line)", borderRadius: 9 }}>
+                      <input type="checkbox" checked={notifications[sev]} onChange={(e) => setNotifications((p) => ({ ...p, [sev]: e.target.checked }))} style={{ width: 15, height: 15, accentColor: colors[sev] }} />
+                      <span style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", padding: "2px 8px", borderRadius: 999, background: `${colors[sev]}12`, color: colors[sev], border: `1px solid ${colors[sev]}30` }}>{sev}</span>
+                      <span style={{ fontSize: "0.78rem", color: "var(--color-mute)" }}>Send alert for {sev} severity incidents</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "var(--color-ink)" }}>Webhook Integration</h3>
+              <Field label="Webhook URL (optional)">
+                <input className="input" type="url" placeholder="https://hooks.slack.com/…" value={notifications.webhook} onChange={(e) => setNotifications((p) => ({ ...p, webhook: e.target.value }))} />
+              </Field>
+            </div>
+          )}
+
+          {activeTab === "Integrations" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+              <h3 style={{ margin: 0, fontSize: "1rem", fontWeight: 700, color: "var(--color-ink)" }}>External Integrations</h3>
+              {[
+                { name: "Splunk SIEM",       status: "Not configured", desc: "Forward events to Splunk HEC endpoint" },
+                { name: "Microsoft Sentinel",status: "Not configured", desc: "Push IOCs to Azure Sentinel workspace" },
+                { name: "PagerDuty",         status: "Not configured", desc: "Critical incident alerting via PagerDuty" },
+                { name: "Jira Service Mgmt", status: "Not configured", desc: "Auto-create Jira tickets for high+ incidents" },
+                { name: "STIX/TAXII Feed",   status: "Active",         desc: "Publish IOCs to threat intelligence sharing" },
+              ].map((item) => (
+                <div key={item.name} style={{ padding: "0.85rem 1rem", background: "rgba(255,255,255,0.02)", border: "1px solid var(--color-line)", borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--color-ink)" }}>{item.name}</div>
+                    <div style={{ fontSize: "0.68rem", color: "var(--color-mute)", marginTop: 2 }}>{item.desc}</div>
                   </div>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-6">
-              <div>
-                <h4 className="text-[10px] font-bold text-ink uppercase tracking-widest mb-3 opacity-70">Score Modifiers</h4>
-                <div className="space-y-2">
-                  {MODIFIERS.slice(0, 5).map((mod) => (
-                    <div key={mod.label} className="flex items-center justify-between text-[11px]">
-                      <span className="text-mute">{mod.label}</span>
-                      <span className={`mono font-bold ${mod.points >= 0 ? "text-high" : "text-low"}`}>
-                        {mod.points >= 0 ? `+${mod.points}` : mod.points}
-                      </span>
-                    </div>
-                  ))}
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ fontSize: "0.65rem", fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: item.status === "Active" ? "rgba(34,197,94,0.1)" : "rgba(100,116,139,0.1)", color: item.status === "Active" ? "#22c55e" : "#64748b", border: `1px solid ${item.status === "Active" ? "rgba(34,197,94,0.25)" : "rgba(100,116,139,0.2)"}` }}>{item.status}</span>
+                    <button className="btn btn-ghost btn-sm">Configure</button>
+                  </div>
                 </div>
-              </div>
-              <div className="p-3 bg-crit/5 border border-crit/20 rounded-lg text-[10px] leading-relaxed text-crit">
-                <span className="font-bold uppercase block mb-1">Global Override</span>
-                Honeytoken use OR real-asset touch forces CRITICAL severity regardless of base score.
-              </div>
+              ))}
             </div>
-          </div>
-        </section>
+          )}
 
-        <section className="bg-panel-card border border-line rounded-xl p-6 shadow-xl">
-          <div className="flex items-center justify-between mb-6 pb-2 border-b border-line">
-            <h2 className="text-[10px] font-bold text-mute uppercase tracking-widest">Network Topology</h2>
-            <Network size={18} className="text-mute" />
+          {/* Save button */}
+          <div style={{ marginTop: "1.5rem", paddingTop: "1.25rem", borderTop: "1px solid var(--color-line)", display: "flex", justifyContent: "flex-end", gap: 8 }}>
+            <button className="btn btn-primary" onClick={handleSave} style={{ gap: 6 }}>
+              <Save size={13} /> Save Changes
+            </button>
           </div>
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="p-3 bg-panel border border-line rounded-lg">
-                <div className="text-[11px] font-bold text-ink mono mb-1">attacker_net</div>
-                <div className="text-[10px] text-mute uppercase tracking-tighter">Deception Fabric</div>
-              </div>
-              <div className="p-3 bg-panel border border-line rounded-lg">
-                <div className="text-[11px] font-bold text-ink mono mb-1">prod_net</div>
-                <div className="text-[10px] text-mute uppercase tracking-tighter">Production Core</div>
-              </div>
-              <div className="p-3 bg-panel border border-line rounded-lg">
-                <div className="text-[11px] font-bold text-ink mono mb-1">mgmt_net</div>
-                <div className="text-[10px] text-mute uppercase tracking-tighter">Control Plane</div>
-              </div>
-            </div>
-            <p className="text-[12px] leading-relaxed text-mute">
-              The simulator is strictly isolated from <code className="text-ink bg-panel px-1 rounded">mgmt_net</code>. 
-              Communication is unidirectional via a shared file volume <code className="text-ink bg-panel px-1 rounded">sim_cmd</code>, 
-              preventing control path traversal into the deception network.
-            </p>
-          </div>
-        </section>
-
-        <section className="bg-panel-card border border-line rounded-xl p-6 shadow-xl">
-          <div className="flex items-center justify-between mb-6 pb-2 border-b border-line">
-            <h2 className="text-[10px] font-bold text-mute uppercase tracking-widest">Runtime Intelligence</h2>
-            <Cpu size={18} className="text-mute" />
-          </div>
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <div>
-                <div className="text-[10px] text-mute uppercase tracking-widest mb-1">Platform</div>
-                <div className="text-sm font-bold text-ink">MIRAGE v2.0</div>
-              </div>
-              <div>
-                <div className="text-[10px] text-mute uppercase tracking-widest mb-1">Infrastructure</div>
-                <div className="text-sm font-bold text-ink">FastAPI · PostgreSQL</div>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <div>
-                <div className="text-[10px] text-mute uppercase tracking-widest mb-1">Telemetry Status</div>
-                <div className={`flex items-center gap-2 text-sm font-bold ${connected ? "text-low" : "text-crit"}`}>
-                  <div className={`w-2 h-2 rounded-full ${connected ? "bg-low shadow-[0_0_8px_rgba(61,214,168,0.5)]" : "bg-crit"}`} />
-                  {connected ? "ACTIVE" : "DISCONNECTED"}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] text-mute uppercase tracking-widest mb-1">System Load</div>
-                <div className="text-sm font-bold text-ink">OPTIMAL</div>
-              </div>
-            </div>
-          </div>
-        </section>
+        </div>
       </div>
     </div>
   );

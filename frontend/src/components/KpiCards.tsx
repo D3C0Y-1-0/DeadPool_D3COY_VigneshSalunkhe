@@ -1,97 +1,40 @@
-import React from "react";
-import { KpiStats } from "../types";
-import { Activity, ShieldAlert, Filter, ShieldCheck, Flame, Users, Target, Shield } from "lucide-react";
+"use client";
 
-export default function KpiCards({ stats }: { stats: KpiStats }) {
+import { Activity, AlertTriangle, Crosshair, ShieldCheck, Siren } from "lucide-react";
+import { KpiStats } from "../types";
+
+interface Props {
+  stats: KpiStats;
+}
+
+export default function KpiCards({ stats }: Props) {
   const cards = [
-    {
-      label: "Total Alerts",
-      value: stats.incidents.toLocaleString(),
-      subtext: "+ 23% vs last 24h",
-      icon: Bell,
-      color: "text-ink",
-      trend: "up",
-      chartColor: "bg-crit"
-    },
-    {
-      label: "Critical Alerts",
-      value: stats.critical_open.toLocaleString(),
-      subtext: "+ 12% vs last 24h",
-      icon: Flame,
-      color: "text-high",
-      trend: "up",
-      chartColor: "bg-high"
-    },
-    {
-      label: "Open Incidents",
-      value: stats.incidents.toLocaleString(),
-      subtext: "- 13% vs last 24h",
-      icon: ShieldAlert,
-      color: "text-accent",
-      trend: "down",
-      chartColor: "bg-accent"
-    },
-    {
-      label: "Assets Monitored",
-      value: "1,248",
-      subtext: "+ 8% vs last 24h",
-      icon: Shield,
-      color: "text-accent",
-      trend: "up",
-      chartColor: "bg-accent"
-    },
-    {
-      label: "Threats Blocked",
-      value: stats.contained.toLocaleString(),
-      subtext: "+ 31% vs last 24h",
-      icon: ShieldCheck,
-      color: "text-low",
-      trend: "up",
-      chartColor: "bg-low"
-    }
+    { id: "raw-events", label: "Raw Events", value: stats.raw_events, icon: Activity, color: "#2563eb" },
+    { id: "incidents", label: "Incidents", value: stats.incidents, icon: Crosshair, color: "#6e44ff" },
+    { id: "critical-open", label: "Critical Open", value: stats.critical_open, icon: Siren, color: "#ef4444" },
+    { id: "contained", label: "Contained", value: stats.contained, icon: ShieldCheck, color: "#10b981" },
+    { id: "opportunistic", label: "Opportunistic", value: stats.opportunistic, icon: AlertTriangle, color: "#f59e0b" },
   ];
 
-  // Helper to get Lucide icon (Bell is missing from imports in previous read, adding it)
-  const getIcon = (label: string) => {
-    switch (label) {
-      case "Total Alerts": return <ShieldAlert className="w-4 h-4" />;
-      case "Critical Alerts": return <Flame className="w-4 h-4" />;
-      case "Open Incidents": return <Activity className="w-4 h-4" />;
-      case "Assets Monitored": return <Shield className="w-4 h-4" />;
-      case "Threats Blocked": return <ShieldCheck className="w-4 h-4" />;
-      default: return <Activity className="w-4 h-4" />;
-    }
-  };
-
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-      {cards.map((c, i) => {
-        return (
-          <div
-            key={i}
-            className="metric-card bg-panel-card border border-line rounded-xl p-5 relative overflow-hidden group hover:border-accent/50 transition-all duration-300"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="p-2 bg-panel rounded-lg border border-line group-hover:bg-accent/10 group-hover:border-accent/20 transition-colors">
-                {getIcon(c.label)}
-              </div>
-              <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${c.trend === 'up' ? 'text-low bg-low/10' : 'text-crit bg-crit/10'}`}>
-                {c.subtext}
-              </div>
-            </div>
-            
-            <div className="space-y-1">
-              <div className="text-[11px] font-bold text-mute uppercase tracking-widest">{c.label}</div>
-              <div className="text-3xl font-bold text-ink tracking-tight">{c.value}</div>
-            </div>
-
-            {/* Simple sparkline decoration */}
-            <div className="absolute bottom-0 left-0 right-0 h-1 bg-line/30">
-              <div className={`h-full ${c.chartColor} opacity-50 w-[70%]`} />
-            </div>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      {cards.map(({ id, label, value, icon: Icon, color }) => (
+        <div
+          key={id}
+          className="min-w-0 rounded-xl border border-[#e5e5e5] bg-white p-4 shadow-[0_4px_20px_rgba(0,0,0,0.03)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)]"
+        >
+          <div className="flex items-center gap-2">
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg" style={{ backgroundColor: `${color}14`, color }}>
+              <Icon size={15} />
+            </span>
+            <span className="min-w-0 text-[11px] font-semibold tracking-tight text-[#525252]">{label}</span>
           </div>
-        );
-      })}
+          <div className="mt-3 font-display text-2xl font-bold tracking-tight text-black">
+            {value.toLocaleString()}
+          </div>
+          <div className="mt-1 text-[11px] text-neutral-500">Current recorded total</div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,21 +1,15 @@
 # syntax=docker/dockerfile:1
 
-# ---- deps: install node_modules from the lockfile ----
-FROM node:20-alpine AS deps
+# ---- builder: compile the Next.js standalone bundle ----
+FROM node:20-alpine AS builder
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm config set minimum-release-age 0 && pnpm install --ignore-scripts
 
-# ---- builder: compile the Next.js standalone bundle ----
-FROM node:20-alpine AS builder
-WORKDIR /app
-RUN corepack enable
-# Next.js evaluates rewrites() at build time, so the API origin must be baked in here.
 ARG MIRAGE_API_URL=http://api:8000
 ENV MIRAGE_API_URL=$MIRAGE_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN npx next build
 

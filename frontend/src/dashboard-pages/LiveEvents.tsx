@@ -1,175 +1,219 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useLive } from "../useLive";
 import { NormalizedEvent } from "../types";
-import { Search, Filter, Clock, Globe, ShieldAlert, Activity, User, Info } from "lucide-react";
-import SeverityBadge from "../components/SeverityBadge";
+import { Activity, Filter, Pause, Play, Radio, RefreshCw, Search, X } from "lucide-react";
 
-function getDetails(event: NormalizedEvent): string {
-  if (event.action === "auth") {
-    return `${event.outcome === "success" ? "Successful" : "Failed"} login for user "${event.user || "unknown"}" with password "${event.password || "********"}"`;
-  }
-  if (event.action === "command") {
-    return `Executed command: ${event.cmd}`;
-  }
-  if (event.action === "web_request") {
-    return `${event.raw?.method || "GET"} ${event.raw?.path || "/"}`;
-  }
-  if (event.action === "scan") {
-    return `Port scan detected on port ${event.dst_port}`;
-  }
-  return event.category || event.action;
+const ACTION_COLORS: Record<string, string> = {
+  auth:        "#3b82f6",
+  command:     "#22c55e",
+  connect:     "#8b5cf6",
+  download:    "#f97316",
+  upload:      "#ec4899",
+  scan:        "#eab308",
+  web_request: "#06b6d4",
+  firewall:    "#64748b",
+  fingerprint: "#94a3b8",
+};
+
+const OUTCOME_COLORS: Record<string, string> = {
+  success: "#22c55e",
+  failure: "#f43f5e",
+  allow:   "#3b82f6",
+  drop:    "#f97316",
+  unknown: "#64748b",
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  cowrie:     "Cowrie SSH",
+  portal:     "Web Portal",
+  opencanary: "OpenCanary",
+  tripwire:   "Tripwire",
+  prod:       "Prod Shield",
+};
+
+function timeStr(iso: string) {
+  try { return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
+  catch { return iso; }
 }
 
-function getRisk(event: NormalizedEvent): "critical" | "high" | "medium" | "low" {
-  if (event.zone === "production") return "critical";
-  if (event.honeytoken_id) return "critical";
-  if (event.action === "auth" && event.outcome === "success") return "high";
-  if (event.action === "command") return "high";
-  if (event.action === "scan") return "medium";
-  return "low";
+function Pill({ label, color }: { label: string; color: string }) {
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", padding: "1px 7px",
+      borderRadius: 999, fontSize: "0.62rem", fontWeight: 700,
+      letterSpacing: "0.06em", textTransform: "uppercase",
+      background: `${color}18`, color, border: `1px solid ${color}40`,
+    }}>{label}</span>
+  );
 }
 
 export default function LiveEvents() {
-  const { events, loading, error } = useLive();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterType, setFilterType] = useState("All Types");
+  const { events, connected } = useLive();
+  const [paused, setPaused] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filterSensor, setFilterSensor] = useState("all");
+  const [filterAction, setFilterAction] = useState("all");
+  const [filterZone, setFilterZone] = useState("all");
+  const [frozen, setFrozen] = useState<NormalizedEvent[]>([]);
+  const tableRef = useRef<HTMLDivElement>(null);
 
-  const filteredEvents = useMemo(() => {
-    return events.filter((e) => {
-      const matchesSearch =
-        e.src_ip.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (e.user && e.user.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (e.cmd && e.cmd.toLowerCase().includes(searchTerm.toLowerCase()));
+  // freeze on pause
+  useEffect(() => {
+    if (!paused) setFrozen([]);
+    else setFrozen(events);
+  }, [paused]);
 
-      const matchesType = filterType === "All Types" || e.action === filterType.toLowerCase();
+  const display = paused ? frozen : events;
 
-      return matchesSearch && matchesType;
+  const sensors = useMemo(() => ["all", ...Array.from(new Set(events.map((e) => e.source)))], [events]);
+  const actions = useMemo(() => ["all", ...Array.from(new Set(events.map((e) => e.action)))], [events]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return display.filter((e) => {
+      if (filterSensor !== "all" && e.source !== filterSensor) return false;
+      if (filterAction !== "all" && e.action !== filterAction) return false;
+      if (filterZone !== "all" && e.zone !== filterZone) return false;
+      if (!q) return true;
+      return [e.src_ip, e.sensor, e.action, e.user ?? "", e.cmd ?? ""]
+        .some((v) => v.toLowerCase().includes(q));
     });
-  }, [events, searchTerm, filterType]);
+  }, [display, search, filterSensor, filterAction, filterZone]);
 
-  const eventTypes = ["All Types", "Auth", "Command", "Scan", "Web_Request", "Firewall"];
+  // Count by sensor
+  const sensorCounts = useMemo(() => {
+    const c: Record<string, number> = {};
+    events.forEach((e) => { c[e.source] = (c[e.source] ?? 0) + 1; });
+    return c;
+  }, [events]);
 
   return (
-    <div className="page-content space-y-6">
-      <section className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "1rem" }}>
         <div>
-          <div className="text-[10px] font-bold text-accent uppercase tracking-widest mb-1">Intelligence</div>
-          <h1 className="text-3xl font-bold text-ink tracking-tight">Live Events</h1>
-          <p className="text-sm text-mute mt-1">Real-time stream of honeypot and production security activities.</p>
+          <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", marginBottom: 4 }}>Live Telemetry</div>
+          <h1 style={{ margin: 0, fontSize: "1.8rem", fontWeight: 800, letterSpacing: "-0.03em", color: "var(--color-ink)" }}>Live Events</h1>
+          <p style={{ margin: "0.3rem 0 0", fontSize: "0.82rem", color: "var(--color-mute)" }}>Real-time stream of all honeypot sensor activity</p>
         </div>
-        <div className="bg-panel-card border border-line rounded-lg px-4 py-2 flex items-center gap-6">
-          <div>
-            <div className="text-[10px] text-mute uppercase tracking-widest mb-0.5">Events / Min</div>
-            <div className="text-lg font-bold text-low flex items-center gap-2">
-              <Activity size={14} />
-              {Math.round(events.length / 5) || 0}
-            </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, padding: "0.4rem 0.85rem", borderRadius: 999, border: `1px solid ${connected ? "rgba(34,197,94,0.3)" : "rgba(244,63,94,0.3)"}`, background: connected ? "rgba(34,197,94,0.06)" : "rgba(244,63,94,0.06)", fontSize: "0.7rem", fontWeight: 700 }}>
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: connected ? "#22c55e" : "#f43f5e", animation: connected ? "dot-pulse 2s infinite" : undefined }} />
+            <span style={{ color: connected ? "#86efac" : "#fca5a5" }}>{connected ? "Live Feed Active" : "Disconnected"}</span>
           </div>
-          <div className="w-px h-8 bg-line" />
-          <div>
-            <div className="text-[10px] text-mute uppercase tracking-widest mb-0.5">Total Captured</div>
-            <div className="text-lg font-bold text-ink">{events.length}</div>
-          </div>
-        </div>
-      </section>
-
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-panel/30 p-4 rounded-xl border border-line">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-mute" size={16} />
-          <input
-            type="text"
-            placeholder="Search by IP, user, or command..."
-            className="w-full bg-panel-card border border-line rounded-lg py-2 pl-10 pr-4 text-sm focus:outline-none focus:border-accent/50 transition-colors"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-1 md:pb-0">
-          {eventTypes.map((type) => (
-            <button
-              key={type}
-              onClick={() => setFilterType(type)}
-              className={`px-4 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
-                filterType === type
-                  ? "bg-accent text-white shadow-lg shadow-accent/20"
-                  : "bg-panel-card border border-line text-mute hover:border-accent/30"
-              }`}
-            >
-              {type}
-            </button>
-          ))}
+          <button
+            onClick={() => setPaused(!paused)}
+            className={`btn btn-sm ${paused ? "btn-primary" : "btn-ghost"}`}
+            style={{ gap: 6 }}
+          >
+            {paused ? <Play size={13} /> : <Pause size={13} />}
+            {paused ? "Resume" : "Pause"}
+          </button>
         </div>
       </div>
 
-      <div className="bg-panel-card border border-line rounded-xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-panel/50 border-b border-line">
-                <th className="px-6 py-4 text-[10px] font-bold text-mute uppercase tracking-widest">Time</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-mute uppercase tracking-widest">Type</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-mute uppercase tracking-widest">Source IP</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-mute uppercase tracking-widest">Username</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-mute uppercase tracking-widest">Details</th>
-                <th className="px-6 py-4 text-[10px] font-bold text-mute uppercase tracking-widest">Risk</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {filteredEvents.map((event) => (
-                <tr key={event.id} className="hover:bg-accent/5 transition-colors group">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2 text-xs text-mute group-hover:text-ink">
-                      <Clock size={12} className="text-accent/50" />
-                      {new Date(event.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded-md ${
-                        event.action === 'auth' ? 'bg-amber-500/10 text-amber-500' :
-                        event.action === 'command' ? 'bg-crit/10 text-crit' :
-                        'bg-accent/10 text-accent'
-                      }`}>
-                        {event.action === 'auth' ? <User size={14} /> : 
-                         event.action === 'command' ? <ShieldAlert size={14} /> : 
-                         <Info size={14} />}
-                      </div>
-                      <span className="text-xs font-bold uppercase tracking-wider text-ink">{event.action}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2">
-                      <Globe size={12} className="text-mute" />
-                      <span className="text-xs font-mono font-medium text-ink">{event.src_ip}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`text-xs ${event.user ? "text-ink font-medium" : "text-mute italic"}`}>
-                      {event.user || "none"}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="text-xs text-mute line-clamp-1 max-w-md group-hover:text-ink transition-colors">
-                      {getDetails(event)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <SeverityBadge severity={getRisk(event)} />
-                  </td>
-                </tr>
-              ))}
-              {filteredEvents.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-mute italic">
-                    {loading ? "Streaming live telemetry..." : "No events match your current filter."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+      {/* Sensor KPI strip */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "0.7rem" }}>
+        {Object.entries(SOURCE_LABELS).map(([key, name]) => (
+          <div key={key} className="card" style={{ padding: "0.85rem 1rem", cursor: "pointer", borderColor: filterSensor === key ? "rgba(59,130,246,0.5)" : undefined }}
+            onClick={() => setFilterSensor(filterSensor === key ? "all" : key)}>
+            <div style={{ fontSize: "0.62rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--color-mute)", marginBottom: 4 }}>{name}</div>
+            <div style={{ fontSize: "1.4rem", fontWeight: 800, fontFamily: "var(--font-mono)", color: "var(--color-ink)" }}>{(sensorCounts[key] ?? 0).toLocaleString()}</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4, fontSize: "0.65rem", color: "#22c55e", fontWeight: 600 }}>
+              <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#22c55e" }} /> Active
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "center", padding: "0.85rem 1rem", background: "var(--color-panel-card)", border: "1px solid var(--color-line)", borderRadius: 12 }}>
+        <div className="input-icon-wrap" style={{ flex: "1 1 200px" }}>
+          <Search size={14} className="icon" />
+          <input
+            className="input"
+            style={{ paddingLeft: "2.25rem" }}
+            placeholder="Search IP, sensor, command…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
         </div>
+        <select className="select-input" value={filterSensor} onChange={(e) => setFilterSensor(e.target.value)} style={{ flex: "0 1 160px" }}>
+          <option value="all">All Sources</option>
+          {Object.entries(SOURCE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <select className="select-input" value={filterAction} onChange={(e) => setFilterAction(e.target.value)} style={{ flex: "0 1 160px" }}>
+          <option value="all">All Actions</option>
+          {actions.filter((a) => a !== "all").map((a) => <option key={a} value={a}>{a}</option>)}
+        </select>
+        <select className="select-input" value={filterZone} onChange={(e) => setFilterZone(e.target.value)} style={{ flex: "0 1 140px" }}>
+          <option value="all">All Zones</option>
+          <option value="deception">Deception</option>
+          <option value="production">Production</option>
+        </select>
+        {(search || filterSensor !== "all" || filterAction !== "all" || filterZone !== "all") && (
+          <button className="btn btn-ghost btn-sm" onClick={() => { setSearch(""); setFilterSensor("all"); setFilterAction("all"); setFilterZone("all"); }}>
+            <X size={12} /> Clear
+          </button>
+        )}
+        <span style={{ marginLeft: "auto", fontSize: "0.7rem", color: "var(--color-mute)", fontFamily: "var(--font-mono)" }}>
+          {filtered.length.toLocaleString()} events
+        </span>
+      </div>
+
+      {/* Event table */}
+      <div className="data-table-wrap" ref={tableRef} style={{ maxHeight: "calc(100vh - 420px)", overflowY: "auto" }}>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th style={{ width: 90 }}>Time</th>
+              <th>Source</th>
+              <th>Action</th>
+              <th>Source IP</th>
+              <th>Sensor</th>
+              <th>Zone</th>
+              <th>Outcome</th>
+              <th>User / Command</th>
+              <th>Flags</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.length === 0 ? (
+              <tr><td colSpan={9}>
+                <div className="empty-state">
+                  <Activity size={28} />
+                  <p>{connected ? "Waiting for events — trigger a demo to start." : "No events. Connect backend and trigger a scenario."}</p>
+                </div>
+              </td></tr>
+            ) : filtered.map((e) => (
+              <tr key={e.id} style={{ borderLeft: `2px solid ${ACTION_COLORS[e.action] ?? "#64748b"}` }}>
+                <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.68rem", color: "var(--color-mute)", whiteSpace: "nowrap" }}>{timeStr(e.ts)}</td>
+                <td>
+                  <span style={{ fontSize: "0.72rem", fontWeight: 600, color: "var(--color-ink)" }}>{SOURCE_LABELS[e.source] ?? e.source}</span>
+                </td>
+                <td><Pill label={e.action} color={ACTION_COLORS[e.action] ?? "#64748b"} /></td>
+                <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.72rem", color: "#93c5fd" }}>{e.src_ip}</td>
+                <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.7rem", color: "var(--color-mute)" }}>{e.sensor}</td>
+                <td>
+                  <span style={{ fontSize: "0.65rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: e.zone === "deception" ? "#8b5cf6" : "#22c55e" }}>
+                    {e.zone}
+                  </span>
+                </td>
+                <td><Pill label={e.outcome} color={OUTCOME_COLORS[e.outcome] ?? "#64748b"} /></td>
+                <td style={{ fontFamily: "var(--font-mono)", fontSize: "0.7rem", color: "#a5b4fc", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {e.cmd ? `$ ${e.cmd}` : e.user ? `${e.user}${e.password ? `:${e.password}` : ""}` : "—"}
+                </td>
+                <td style={{ fontSize: "0.65rem" }}>
+                  {(e.flags ?? []).slice(0, 2).map((f) => (
+                    <span key={f} style={{ display: "inline-block", marginRight: 3, padding: "1px 5px", borderRadius: 4, background: "rgba(234,179,8,0.1)", color: "#eab308", border: "1px solid rgba(234,179,8,0.2)", fontSize: "0.6rem", fontWeight: 700 }}>{f}</span>
+                  ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

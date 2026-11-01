@@ -1,6 +1,9 @@
 import os
 import datetime as dt
-from sqlalchemy import create_engine, Column, String, Integer, Boolean, JSON, Text, ForeignKey
+from sqlalchemy import (
+    create_engine, Column, String, Integer, Boolean, JSON, Text, ForeignKey,
+    UniqueConstraint
+)
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
 Base = declarative_base()
@@ -138,6 +141,39 @@ class AuditLogRow(Base):
     after_state = Column(JSON, nullable=True)
     timestamp = Column(String, default=_utcnow_iso)
     correlation_id = Column(String, nullable=True)
+
+class EndpointAgentRow(Base):
+    __tablename__ = "endpoint_agents"
+
+    id = Column(String, primary_key=True)
+    hostname = Column(String, nullable=False, index=True)
+    operating_system = Column(String, nullable=False)
+    os_version = Column(String, nullable=False)
+    agent_version = Column(String, nullable=False)
+    token_hash = Column(String, nullable=False, unique=True, index=True)
+    status = Column(String, nullable=False, default="active", index=True)
+    registered_at = Column(String, nullable=False, default=_utcnow_iso)
+    last_heartbeat = Column(String, nullable=True, index=True)
+    last_event_at = Column(String, nullable=True)
+    revoked_at = Column(String, nullable=True)
+
+class EndpointSecurityEventRow(Base):
+    __tablename__ = "endpoint_security_events"
+    __table_args__ = (
+        UniqueConstraint("agent_id", "event_id", name="uq_endpoint_event_agent_event"),
+    )
+
+    id = Column(String, primary_key=True)
+    event_id = Column(String, nullable=False, index=True)
+    agent_id = Column(String, ForeignKey("endpoint_agents.id"), nullable=False, index=True)
+    timestamp = Column(String, nullable=False, index=True)
+    received_at = Column(String, nullable=False, default=_utcnow_iso, index=True)
+    source = Column(String, nullable=False, index=True)
+    event_type = Column(String, nullable=False, index=True)
+    severity = Column(String, nullable=False, index=True)
+    message = Column(Text, nullable=False)
+    source_ip = Column(String, nullable=True, index=True)
+    raw_event = Column(JSON, nullable=False, default=dict)
 
 def init_db():
     Base.metadata.create_all(engine)

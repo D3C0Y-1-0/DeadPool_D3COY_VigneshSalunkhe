@@ -1,12 +1,3 @@
-/* ==========================================================================
-   MIRAGE — marketing landing page styling
-   Verbatim from the reference design system (dark cosmic aesthetic).
-   Scoped under .marketing-site so it cannot leak into the dashboard.
-   ========================================================================== */
-/* ==========================================================================
-   MARKETING LANDING PAGE & AI SAAS AUTH STYLING (DARK COSMIC AESTHETIC)
-   ========================================================================== */
-
 .marketing-site {
   --cosmic-bg: #040408;
   --cosmic-surface: #0b0c15;

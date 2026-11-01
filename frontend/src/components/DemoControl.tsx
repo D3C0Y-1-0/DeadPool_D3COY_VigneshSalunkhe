@@ -1,138 +1,96 @@
+"use client";
+
 import React, { useState } from "react";
 import { triggerDemo, resetDemo } from "../api";
-import { Play, RotateCcw, Zap, ShieldAlert, CheckCircle2, X } from "lucide-react";
+import { CheckCircle, Play, Shield, Trash2, X, Zap } from "lucide-react";
 
-interface Props {
-  isOpen: boolean;
-  onClose: () => void;
-  onRefresh: () => void;
-}
+interface Props { isOpen: boolean; onClose: () => void; onRefresh: () => void; }
 
 export default function DemoControl({ isOpen, onClose, onRefresh }: Props) {
-  const [runningScenario, setRunningScenario] = useState<string | null>(null);
+  const [running, setRunning] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [msgOk, setMsgOk] = useState(true);
 
   if (!isOpen) return null;
 
-  const handleTrigger = async (scenario: "targeted" | "noise") => {
-    setRunningScenario(scenario);
-    setMsg(`Triggered '${scenario}' attack simulator...`);
+  const trigger = async (scenario: "targeted" | "noise") => {
+    setRunning(scenario); setMsg(null);
     try {
       await triggerDemo(scenario);
-      setMsg(`Scenario '${scenario}' is executing inside isolated container.`);
-      setTimeout(() => {
-        onRefresh();
-      }, 1000);
-    } catch (e: any) {
-      setMsg(`Error: ${e.message}`);
-    } finally {
-      setTimeout(() => setRunningScenario(null), 1500);
-    }
+      setMsg(`Scenario '${scenario}' launched — events appear in 5–15 seconds.`); setMsgOk(true);
+      setTimeout(onRefresh, 3000);
+    } catch (e: any) { setMsg(`Error: ${e.message}`); setMsgOk(false); }
+    finally { setTimeout(() => setRunning(null), 1500); }
   };
 
-  const handleReset = async () => {
-    setRunningScenario("reset");
-    setMsg("Clearing all events, incidents and firewall blocklists...");
-    try {
-      await resetDemo();
-      setMsg("MIRAGE platform reset to pristine state.");
-      onRefresh();
-    } catch (e: any) {
-      setMsg(`Reset error: ${e.message}`);
-    } finally {
-      setTimeout(() => setRunningScenario(null), 1000);
-    }
+  const reset = async () => {
+    setRunning("reset"); setMsg(null);
+    try { await resetDemo(); setMsg("Platform reset — all data cleared."); setMsgOk(true); onRefresh(); }
+    catch (e: any) { setMsg(`Reset error: ${e.message}`); setMsgOk(false); }
+    finally { setTimeout(() => setRunning(null), 1000); }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white border border-slate-200 rounded-xl max-w-md w-full p-5 shadow-2xl relative">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 cursor-pointer"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        <div className="flex items-center gap-2 mb-3">
-          <Zap className="w-5 h-5 text-slate-700" />
-          <h2 className="text-base font-bold text-slate-900 uppercase tracking-wide">
-            Interactive Demo Control
-          </h2>
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 9, background: "rgba(110,68,255,0.08)", border: "1px solid rgba(110,68,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center", color: "#6e44ff" }}>
+              <Zap size={15} />
+            </div>
+            <h2 style={{ margin: 0, fontSize: "0.95rem", fontWeight: 700, color: "#000", fontFamily: "var(--font-display)" }}>Demo Simulator</h2>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#9ca3af", padding: 4 }}><X size={15} /></button>
         </div>
 
-        <p className="text-xs text-slate-500 mb-4">
-          Authorised deception lab simulator. Generates live synthetic adversary telemetry inside the isolated <code className="mono text-slate-700">attacker_net</code> container network.
+        <p style={{ margin: "0 0 1.15rem", fontSize: "0.78rem", color: "#737373", lineHeight: 1.65 }}>
+          Authorised lab simulator. Generates synthetic adversary telemetry inside the isolated{" "}
+          <code style={{ fontFamily: "var(--font-mono)", background: "#f5f5f5", padding: "1px 5px", borderRadius: 4, color: "#374151", fontSize: "0.72rem" }}>attacker_net</code>{" "}
+          container network only.
         </p>
 
-        <div className="space-y-3">
-          <div className="p-3 rounded-lg border border-red-200 bg-red-50 flex items-center justify-between">
-            <div>
-              <div className="text-xs font-bold text-red-700 uppercase">
-                Targeted Attack (PS 04 Scenario)
+        <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: "1rem" }}>
+          {[
+            { id: "targeted", title: "Targeted APT Attack", desc: "Full kill-chain: SSH brute-force → exec → honeytoken → lateral pivot → CRITICAL incident", color: "#ef4444", bg: "rgba(239,68,68,0.05)", border: "rgba(239,68,68,0.18)" },
+            { id: "noise",    title: "Background Noise Storm", desc: "15+ automated scanners and credential-stuffing bots — tests noise suppression", color: "#f59e0b", bg: "rgba(245,158,11,0.05)", border: "rgba(245,158,11,0.18)" },
+          ].map((s) => (
+            <div key={s.id} style={{ padding: "0.85rem 1rem", background: s.bg, border: `1px solid ${s.border}`, borderRadius: 11, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+              <div>
+                <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#000", marginBottom: 3 }}>{s.title}</div>
+                <div style={{ fontSize: "0.7rem", color: "#737373" }}>{s.desc}</div>
               </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                Full kill-chain: Scan → Decoy SSH → Stolen Creds → Prod Pivot
-              </div>
+              <button
+                disabled={running !== null}
+                onClick={() => trigger(s.id as any)}
+                style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "0.4rem 0.8rem", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700, background: `${s.color}10`, color: s.color, border: `1px solid ${s.color}30`, cursor: "pointer", whiteSpace: "nowrap" }}
+              >
+                <Play size={12} fill="currentColor" />
+                {running === s.id ? "Launching…" : "Launch"}
+              </button>
             </div>
-            <button
-              onClick={() => handleTrigger("targeted")}
-              disabled={runningScenario !== null}
-              className="danger-btn text-xs flex items-center gap-1"
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              {runningScenario === "targeted" ? "Running..." : "Launch"}
-            </button>
-          </div>
+          ))}
 
-          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between">
+          <div style={{ padding: "0.85rem 1rem", background: "#fafafa", border: "1px solid var(--color-border)", borderRadius: 11, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
             <div>
-              <div className="text-xs font-bold text-slate-700 uppercase">
-                Background Noise Storm
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                Simulates 15+ automated botnet scanners & rapid dictionary attacks
-              </div>
+              <div style={{ fontSize: "0.8rem", fontWeight: 700, color: "#000", marginBottom: 3 }}>Reset All Data</div>
+              <div style={{ fontSize: "0.7rem", color: "#737373" }}>Flush database, incidents, events and blocklist</div>
             </div>
-            <button
-              onClick={() => handleTrigger("noise")}
-              disabled={runningScenario !== null}
-              className="primary-btn text-xs flex items-center gap-1"
-            >
-              <Play className="w-3.5 h-3.5 fill-current" />
-              {runningScenario === "noise" ? "Spamming..." : "Noise"}
-            </button>
-          </div>
-
-          <div className="p-3 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-between">
-            <div>
-              <div className="text-xs font-bold text-slate-900 uppercase">
-                Reset Demo Environment
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                Flushes database tables and resets prod firewall blocklist
-              </div>
-            </div>
-            <button
-              onClick={handleReset}
-              disabled={runningScenario !== null}
-              className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 rounded text-xs font-semibold flex items-center gap-1 cursor-pointer transition-colors border border-slate-300"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              {runningScenario === "reset" ? "Resetting..." : "Reset"}
+            <button disabled={running !== null} onClick={reset} style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, padding: "0.4rem 0.8rem", borderRadius: 8, fontSize: "0.72rem", fontWeight: 700, background: "#f5f5f5", color: "#374151", border: "1px solid var(--color-border)", cursor: "pointer", whiteSpace: "nowrap" }}>
+              <Trash2 size={12} />
+              {running === "reset" ? "Resetting…" : "Reset"}
             </button>
           </div>
         </div>
 
         {msg && (
-          <div className="mt-4 p-2 rounded bg-slate-50 border border-slate-200 text-xs mono text-emerald-700 flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">{msg}</span>
+          <div style={{ padding: "0.6rem 0.85rem", background: msgOk ? "rgba(16,185,129,0.06)" : "rgba(239,68,68,0.06)", border: `1px solid ${msgOk ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}`, borderRadius: 9, fontSize: "0.73rem", color: msgOk ? "#065f46" : "#b91c1c", display: "flex", alignItems: "center", gap: 7 }}>
+            <CheckCircle size={13} style={{ flexShrink: 0 }} /> {msg}
           </div>
         )}
 
-        <div className="mt-4 text-[11px] text-slate-500 text-center border-t border-slate-200 pt-3">
-          Lab mode: isolated • Cap-drop enabled • No egress
+        <div style={{ marginTop: "0.85rem", paddingTop: "0.75rem", borderTop: "1px solid var(--color-border)", fontSize: "0.64rem", color: "#9ca3af", textAlign: "center" }}>
+          <Shield size={10} style={{ verticalAlign: "middle", marginRight: 4 }} />
+          Lab mode · isolated · cap_drop ALL · no internet egress
         </div>
       </div>
     </div>

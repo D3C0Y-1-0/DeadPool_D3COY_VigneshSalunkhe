@@ -1,293 +1,390 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { fetchIncident } from "../api";
-import { useLive } from "../useLive";
-import { Incident } from "../types";
-import KillChainBar from "../components/KillChainBar";
-import AttackChainGraph from "../components/AttackChainGraph";
-import Transcript from "../components/Transcript";
-import ActionsPanel from "../components/ActionsPanel";
+import React, { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { fetchIncident, executeAction, updateIncidentStatus, exportStixUrl, exportCsvUrl } from "../api";
+import { Incident, ActionItem, TimelineItem } from "../types";
 import SeverityBadge from "../components/SeverityBadge";
-import { ArrowLeft, Crosshair, Globe, ShieldCheck, AlertCircle, ShieldAlert } from "lucide-react";
+import IncidentAttackGraph from "../components/IncidentAttackGraph";
+import AttackTimeline from "../components/AttackTimeline";
+import { downloadIncidentPdf } from "../utils/pdfReports";
+import {
+  ArrowLeft, CheckCircle, Crosshair, Download, FileText,
+  Flame, Globe, RefreshCw, Shield, ShieldAlert, Terminal, Zap,
+  AlertTriangle, ChevronRight, Info, Lock, CheckSquare, Square
+} from "lucide-react";
 
-export default function IncidentPage({ id }: { id: string }) {
-  const { incidents, refreshAll } = useLive();
+interface Props { id: string; }
+
+const SEV_COLOR: Record<string, string> = {
+  critical: "#f43f5e", high: "#f97316", medium: "#eab308", low: "#22c55e",
+};
+
+const STAGE_ORDER = ["recon","credential_attack","initial_access","execution","discovery","collection","exfiltration","persistence","lateral_movement","impact"];
+const STAGE_LABELS: Record<string, string> = {
+  recon: "Recon", credential_attack: "Cred Attack", initial_access: "Initial Access",
+  execution: "Execution", discovery: "Discovery", collection: "Collection",
+  exfiltration: "Exfiltration", persistence: "Persistence",
+  lateral_movement: "Lateral Move", impact: "Impact",
+};
+
+const ACTION_ICONS: Record<string, React.ReactNode> = {
+  block_source:        <ShieldAlert size={14} />,
+  isolate_host:        <Lock size={14} />,
+  rotate_credentials:  <RefreshCw size={14} />,
+  hunt:                <Crosshair size={14} />,
+  export_iocs:         <Download size={14} />,
+  monitor:             <Info size={14} />,
+};
+
+const ACTION_COLOR: Record<string, { bg: string; color: string; border: string }> = {
+  block_source:       { bg: "rgba(244,63,94,0.08)",  color: "#f43f5e", border: "rgba(244,63,94,0.25)"  },
+  isolate_host:       { bg: "rgba(249,115,22,0.08)", color: "#f97316", border: "rgba(249,115,22,0.25)" },
+  rotate_credentials: { bg: "rgba(234,179,8,0.08)",  color: "#eab308", border: "rgba(234,179,8,0.25)"  },
+  hunt:               { bg: "rgba(59,130,246,0.08)", color: "#3b82f6", border: "rgba(59,130,246,0.25)" },
+  export_iocs:        { bg: "rgba(34,197,94,0.08)",  color: "#22c55e", border: "rgba(34,197,94,0.25)"  },
+  monitor:            { bg: "rgba(100,116,139,0.08)",color: "#64748b", border: "rgba(100,116,139,0.25)"},
+};
+
+export default function IncidentPage({ id }: Props) {
   const [incident, setIncident] = useState<Incident | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"overview"|"timeline"|"commands"|"techniques"|"actions">("overview");
+  const [executing, setExecuting] = useState<Record<string, boolean>>({});
+  const [actionResults, setActionResults] = useState<Record<string, string>>({});
+  const [pdfReportMessage, setPdfReportMessage] = useState<string | null>(null);
+  const [pdfReportError, setPdfReportError] = useState(false);
 
-  const loadData = useCallback(async () => {
-    if (!id) return;
+  const load = useCallback(async () => {
     setLoading(true);
     try {
-      const data = await fetchIncident(id);
-      setIncident(data);
+      const inc = await fetchIncident(id);
+      setIncident(inc);
       setError(null);
-    } catch (cause) {
-      setIncident(null);
-      setError(cause instanceof Error ? cause.message : "Could not load incident data.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: any) {
+      setError(e.message ?? "Failed to load incident");
+    } finally { setLoading(false); }
   }, [id]);
 
-  useEffect(() => {
-    loadData();
-  }, [id, loadData]);
+  useEffect(() => { load(); }, [load]);
 
-  // Live WebSocket update reflection
-  useEffect(() => {
-    if (id && incidents[id]) {
-      const liveData = incidents[id] as Incident;
-      if (liveData.timeline) {
-        setIncident(liveData);
-      }
+  const handleAction = async (act: ActionItem, mode: "approve" | "dry_run") => {
+    if (!incident) return;
+    setExecuting((p) => ({ ...p, [act.id]: true }));
+    try {
+      const updated = await executeAction(incident.id, act.id, mode);
+      setActionResults((p) => ({ ...p, [act.id]: updated.result ?? (mode === "dry_run" ? "Dry-run succeeded. No changes applied." : "Action executed successfully.") }));
+      await load();
+    } catch (e: any) {
+      setActionResults((p) => ({ ...p, [act.id]: `Error: ${e.message}` }));
+    } finally {
+      setExecuting((p) => ({ ...p, [act.id]: false }));
     }
-  }, [id, incidents]);
+  };
 
-  if (loading && !incident) {
-    return (
-      <div className="h-full flex items-center justify-center text-muted text-sm">
-        Loading adversary investigation telemetry...
-      </div>
-    );
-  }
+  const handleStatusUpdate = async (status: string) => {
+    if (!incident) return;
+    try { await updateIncidentStatus(incident.id, status as any); await load(); } catch { /* ignore */ }
+  };
 
-  if (!incident) {
-    return (
-      <div className="empty-state p-8 text-center">
-        <AlertCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-        <p className="text-muted">{error || `Incident ${id} was not found.`}</p>
-        <a href="/" className="back-link mt-2 inline-flex">
-          Return to Command Center
-        </a>
-      </div>
-    );
-  }
+  const handleDownloadPdf = () => {
+    if (!incident) return;
+    setPdfReportMessage(null);
+    setPdfReportError(false);
+    try {
+      downloadIncidentPdf(incident);
+      setPdfReportMessage("Incident PDF report downloaded.");
+    } catch (e) {
+      setPdfReportError(true);
+      setPdfReportMessage(e instanceof Error ? e.message : "Could not generate the incident report.");
+    }
+  };
 
-  const isContained = incident.status === "contained";
+  if (loading) return (
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400, gap: 12, color: "var(--color-mute)" }}>
+      <RefreshCw size={20} style={{ animation: "spin 1s linear infinite" }} />
+      <span>Loading incident…</span>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+
+  if (error || !incident) return (
+    <div className="notice notice-danger" style={{ maxWidth: 500, margin: "2rem auto" }}>
+      <AlertTriangle size={16} /> {error ?? "Incident not found."}{" "}
+      <Link href="/dashboard/incidents" style={{ color: "var(--color-accent)", marginLeft: 4 }}>← Back to incidents</Link>
+    </div>
+  );
+
+  const inc = incident;
+  const color = SEV_COLOR[inc.severity] ?? "#64748b";
+  const stageIdx = STAGE_ORDER.indexOf(inc.stage);
 
   return (
-    <div className="page-content space-y-6 pb-12">
-      {/* Top Breadcrumb & Incident Header */}
-      <div className="bg-panel-card border border-line rounded-xl p-6 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-accent/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl pointer-events-none" />
-        
-        <div className="flex items-start gap-6 relative z-10">
-          <a
-            href="/dashboard/incidents"
-            className="p-2.5 bg-panel border border-line rounded-lg text-mute hover:text-ink hover:border-accent/50 transition-all shadow-lg"
-            title="Back to Incidents"
-          >
-            <ArrowLeft size={18} />
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+      {/* Back + export bar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <Link href="/dashboard/incidents" className="btn btn-ghost btn-sm">
+          <ArrowLeft size={13} /> Back to Incidents
+        </Link>
+        <div style={{ display: "flex", gap: 6 }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={handleDownloadPdf} style={{ gap: 5 }}>
+            <FileText size={13} /> Export PDF
+          </button>
+          <a href={exportCsvUrl(inc.id)} target="_blank" className="btn btn-ghost btn-sm" style={{ gap: 5 }}>
+            <FileText size={13} /> Export CSV
           </a>
+          <a href={exportStixUrl(inc.id)} target="_blank" className="btn btn-ghost btn-sm" style={{ gap: 5 }}>
+            <Download size={13} /> Export STIX 2.1
+          </a>
+          <button className="btn btn-ghost btn-sm" onClick={load} style={{ gap: 5 }}>
+            <RefreshCw size={13} /> Refresh
+          </button>
+        </div>
+      </div>
 
-          <div>
-            <div className="flex flex-wrap items-center gap-3">
-              <SeverityBadge
-                severity={incident.severity}
-                score={incident.score}
-                pulse={!isContained}
-              />
-              <h1 className="mono text-2xl font-bold text-ink tracking-tight">
-                {incident.src_ip}
+      {pdfReportMessage && (
+        <div className={`notice ${pdfReportError ? "notice-warning" : "notice-success"}`} role={pdfReportError ? "alert" : "status"} aria-live="polite">
+          {pdfReportMessage}
+        </div>
+      )}
+
+      {/* Hero card */}
+      <div className="card" style={{ borderColor: `${color}40`, padding: "1.5rem" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "1.25rem", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", gap: "1.25rem", alignItems: "center" }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: `${color}15`, border: `1px solid ${color}40`, display: "flex", alignItems: "center", justifyContent: "center", color, flexShrink: 0 }}>
+              <Crosshair size={26} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+                <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.7rem", fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "rgba(59,130,246,0.1)", color: "#93c5fd", border: "1px solid rgba(59,130,246,0.2)" }}>{inc.id}</span>
+                <SeverityBadge severity={inc.severity} score={inc.score} pulse={inc.status === "open"} />
+                <span style={{ fontSize: "0.68rem", fontWeight: 700, textTransform: "uppercase", padding: "2px 8px", borderRadius: 999, background: inc.verdict === "targeted" ? "rgba(244,63,94,0.12)" : "rgba(100,116,139,0.1)", color: inc.verdict === "targeted" ? "#f43f5e" : "#94a3b8", border: `1px solid ${inc.verdict === "targeted" ? "rgba(244,63,94,0.3)" : "rgba(100,116,139,0.2)"}` }}>{inc.verdict}</span>
+              </div>
+              <h1 style={{ margin: 0, fontSize: "clamp(1.1rem,2vw,1.5rem)", fontWeight: 800, color: "var(--color-ink)" }}>
+                {inc.real_asset_touched ? "Production Host Pivot" : inc.honeytoken_hit ? "Honeytoken Exfiltration Attack" : "Deception Fabric Intrusion"} from {inc.src_ip}
               </h1>
-              <div className="flex items-center gap-2 px-3 py-1 bg-panel border border-line rounded-full">
-                <Globe size={12} className="text-mute" />
-                <span className="text-[11px] font-bold text-mute uppercase tracking-widest">
-                  {incident.country} • {incident.asn}
-                </span>
-              </div>
-              {incident.real_asset_touched && (
-                <span className="px-3 py-1 rounded-full bg-crit/10 border border-crit/30 text-crit text-[10px] font-bold uppercase tracking-widest animate-pulse shadow-[0_0_15px_rgba(255,59,92,0.2)]">
-                  Critical: Production Breach Detected
-                </span>
-              )}
+              <p style={{ margin: "0.4rem 0 0", fontSize: "0.8rem", color: "var(--color-mute)", maxWidth: 700 }}>{inc.narrative}</p>
             </div>
-
-            <div className="flex flex-wrap items-center gap-4 text-[11px] text-mute mt-4">
-              <div className="flex items-center gap-2">
-                {incident.verdict === "targeted" ? (
-                  <span className="text-crit flex items-center gap-1.5 font-bold uppercase tracking-wider">
-                    <Crosshair size={14} /> Targeted Adversary (APT)
-                  </span>
-                ) : (
-                  <span className="text-mute flex items-center gap-1.5 font-bold uppercase tracking-wider">
-                    <Globe size={14} /> Opportunistic Bot/Scanner
-                  </span>
-                )}
-              </div>
-              <div className="w-1 h-1 rounded-full bg-line" />
-              <div className="flex items-center gap-2">
-                <span className="uppercase tracking-widest">Status:</span>
-                <b className={`font-mono ${isContained ? "text-low" : "text-crit"}`}>
-                  {incident.status.toUpperCase()}
-                </b>
-              </div>
-              <div className="w-1 h-1 rounded-full bg-line" />
-              <div className="flex items-center gap-2">
-                <span className="uppercase tracking-widest">Duration:</span>
-                <b className="text-ink font-mono">{incident.duration_s}s</b>
-              </div>
-              <div className="w-1 h-1 rounded-full bg-line" />
-              <div className="flex items-center gap-2">
-                <span className="uppercase tracking-widest">Actor Cadence:</span>
-                <b className="text-ink font-mono">{incident.profile?.cadence || "unknown"}</b>
-              </div>
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+            <select
+              className="select-input"
+              value={inc.status}
+              onChange={(e) => handleStatusUpdate(e.target.value)}
+              style={{ width: 180, fontSize: "0.75rem" }}
+            >
+              <option value="open">🔴 Open</option>
+              <option value="investigating">🟡 Investigating</option>
+              <option value="contained">🟢 Contained</option>
+              <option value="resolved">🔵 Resolved</option>
+              <option value="false_positive">⚪ False Positive</option>
+            </select>
+            <div style={{ display: "flex", gap: 5 }}>
+              {inc.honeytoken_hit && <span style={{ fontSize: "0.65rem", fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: "rgba(139,92,246,0.12)", color: "#a78bfa", border: "1px solid rgba(139,92,246,0.25)" }}>Honeytoken</span>}
+              {inc.real_asset_touched && <span style={{ fontSize: "0.65rem", fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: "rgba(244,63,94,0.12)", color: "#f43f5e", border: "1px solid rgba(244,63,94,0.25)" }}>Prod Touched</span>}
             </div>
           </div>
         </div>
 
-        {isContained ? (
-          <div className="flex items-center gap-3 rounded-xl border border-low/30 bg-low/5 text-low px-5 py-3 text-xs font-bold shadow-[0_0_20px_rgba(61,214,168,0.1)] relative z-10">
-            <ShieldCheck size={20} className="animate-pulse" />
-            <div>
-              <div className="uppercase tracking-widest text-[10px] opacity-70">Defense Active</div>
-              <span>Adversary traffic dropped at edge firewall</span>
+        {/* Stat row */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: "0.75rem", marginTop: "1.25rem", paddingTop: "1.25rem", borderTop: "1px solid var(--color-line)" }}>
+          {[
+            { label: "Source IP",     val: inc.src_ip, mono: true },
+            { label: "Country / ASN", val: `${inc.country} · ${inc.asn}` },
+            { label: "First Seen",    val: inc.first_seen ? new Date(inc.first_seen).toLocaleString() : "—", mono: true },
+            { label: "Duration",      val: inc.duration_s ? `${Math.round(inc.duration_s / 60)}m ${inc.duration_s % 60}s` : "—" },
+            { label: "Events",        val: (inc.timeline?.length ?? 0).toString(), mono: true },
+            { label: "Techniques",    val: (inc.techniques?.length ?? 0).toString(), mono: true },
+          ].map((d) => (
+            <div key={d.label}>
+              <div style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--color-mute)", marginBottom: 3 }}>{d.label}</div>
+              <div style={{ fontSize: "0.78rem", fontFamily: d.mono ? "var(--font-mono)" : undefined, color: "var(--color-ink)", wordBreak: "break-all" }}>{d.val}</div>
             </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3 rounded-xl border border-crit/30 bg-crit/5 text-crit px-5 py-3 text-xs font-bold shadow-[0_0_20px_rgba(255,59,92,0.1)] relative z-10">
-            <ShieldAlert size={20} className="animate-bounce" />
-            <div>
-              <div className="uppercase tracking-widest text-[10px] opacity-70">Action Required</div>
-              <span>Active intrusion detected - recommend containment</span>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Kill Chain Progress Bar */}
-      <KillChainBar stage={incident.stage} />
-
-      {/* Automated Narrative Strip */}
-      <div className="bg-panel-card border border-line rounded-xl p-5 text-xs text-ink/80 leading-relaxed flex items-start gap-4 shadow-lg border-l-4 border-l-accent">
-        <div className="p-2 bg-accent/10 rounded-lg text-accent">
-          <Info size={18} />
-        </div>
-        <div>
-          <span className="font-bold text-accent uppercase text-[10px] tracking-widest block mb-2">
-            Automated Intelligence Narrative
-          </span>
-          <p className="text-[13px] leading-relaxed italic opacity-90">"{incident.narrative}"</p>
+          ))}
         </div>
       </div>
 
-      {/* Attack Chain React Flow Graph */}
-      <div className="bg-panel-card border border-line rounded-xl overflow-hidden shadow-2xl h-[400px]">
-        <AttackChainGraph
-          timeline={incident.timeline || []}
-          realAssetTouched={incident.real_asset_touched}
-        />
+      {/* Interactive Incident Attack Graph (Flow Graph instead of linear chain) */}
+      <IncidentAttackGraph incident={inc} height={460} />
+
+      {/* Risk score */}
+      <div className="card" style={{ padding: "1rem 1.25rem" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.75rem" }}>
+          <div className="card-title"><Flame size={13} style={{ verticalAlign: "middle", marginRight: 6, color }} />Risk Score</div>
+          <span style={{ fontFamily: "var(--font-mono)", fontSize: "1.4rem", fontWeight: 800, color }}>{inc.score} <span style={{ fontSize: "0.7rem", color: "var(--color-mute)", fontWeight: 400 }}>/ 100</span></span>
+        </div>
+        <div className="risk-gauge-track">
+          <div className="risk-gauge-fill" style={{ width: `${Math.max(5, inc.score)}%` }} />
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: "0.85rem" }}>
+          {(inc.factors ?? []).map((f, i) => (
+            <div key={i} style={{ padding: "0.35rem 0.65rem", background: "rgba(255,255,255,0.03)", border: "1px solid var(--color-line)", borderRadius: 8, fontSize: "0.7rem" }}>
+              <span style={{ color: "var(--color-mute)" }}>{f.label} </span>
+              <span style={{ fontWeight: 800, fontFamily: "var(--font-mono)", color: f.points >= 0 ? "#f43f5e" : "#22c55e" }}>{f.points > 0 ? "+" : ""}{f.points}</span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* 3-Column Correlation & Evidence Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Why This Score */}
-        <div className="bg-panel-card border border-line rounded-xl p-5 flex flex-col h-[320px] shadow-xl">
-          <h3 className="text-[10px] font-bold text-mute uppercase tracking-widest mb-4 pb-2 border-b border-line flex items-center justify-between">
-            Risk Analysis Factors
-            <span className="text-accent">Explainable AI</span>
-          </h3>
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
-            {incident.factors.map((f, i) => (
-              <div key={i} className="flex items-center justify-between text-[11px] group">
-                <span className="text-mute group-hover:text-ink transition-colors">{f.label}</span>
-                <span
-                  className={`mono font-bold px-2 py-0.5 rounded text-[10px] ${
-                    f.points < 0
-                      ? "bg-low/10 text-low border border-low/20"
-                      : "bg-high/10 text-high border border-high/20"
-                  }`}
-                >
-                  {f.points > 0 ? `+${f.points}` : f.points}
-                </span>
+      {/* Tabbed content */}
+      <div className="tab-bar">
+        {(["overview","timeline","commands","techniques","actions"] as const).map((t) => (
+          <button key={t} className={`tab-btn ${activeTab === t ? "active" : ""}`} onClick={() => setActiveTab(t)} style={{ textTransform: "capitalize" }}>
+            {t === "actions" ? `Actions (${(inc.actions ?? []).length})` : t}
+          </button>
+        ))}
+      </div>
+
+      {/* Overview */}
+      {activeTab === "overview" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.25rem" }}>
+          <div className="card">
+            <div className="card-title" style={{ marginBottom: "0.85rem" }}>Behavioral Profile</div>
+            {[
+              { label: "Cadence",     val: inc.profile?.cadence ?? "—" },
+              { label: "Median Gap",  val: inc.profile?.median_gap_s ? `${inc.profile.median_gap_s}s` : "—" },
+              { label: "Sessions",    val: String(inc.profile?.sessions ?? "—") },
+              { label: "SSH Client",  val: inc.profile?.ssh_client ?? "—" },
+              { label: "HASSH",       val: inc.profile?.hassh ?? "—" },
+              { label: "Sensors Hit", val: (inc.profile?.sensors ?? []).join(", ") || "—" },
+            ].map((d) => (
+              <div key={d.label} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "0.55rem 0", borderBottom: "1px solid rgba(30,45,69,0.6)", gap: 12 }}>
+                <span style={{ fontSize: "0.75rem", color: "var(--color-mute)" }}>{d.label}</span>
+                <span style={{ fontSize: "0.75rem", fontFamily: "var(--font-mono)", color: "var(--color-ink)", textAlign: "right", wordBreak: "break-all", maxWidth: "60%" }}>{d.val}</span>
               </div>
             ))}
           </div>
-        </div>
-
-        {/* MITRE ATT&CK Techniques */}
-        <div className="bg-panel-card border border-line rounded-xl p-5 flex flex-col h-[320px] shadow-xl">
-          <h3 className="text-[10px] font-bold text-mute uppercase tracking-widest mb-4 pb-2 border-b border-line flex items-center justify-between">
-            ATT&CK Mappings
-            <span className="text-accent">{incident.techniques.length} Detected</span>
-          </h3>
-          <div className="flex-1 overflow-y-auto flex flex-wrap gap-2 content-start pr-2 scrollbar-thin">
-            {incident.techniques.map((t) => (
-              <a
-                key={t.id}
-                href={`https://attack.mitre.org/techniques/${t.id.replace(".", "/")}/`}
-                target="_blank"
-                rel="noreferrer"
-                title={`${t.name} (${t.tactic})`}
-                className="text-[10px] bg-panel hover:bg-panel-card text-accent border border-line px-2.5 py-1.5 rounded-lg mono transition-all hover:border-accent/50 hover:shadow-[0_0_10px_rgba(77,163,255,0.1)] flex items-center gap-2"
-              >
-                <span className="font-bold">{t.id}</span>
-                <span className="text-mute group-hover:text-ink truncate max-w-[120px]">{t.name}</span>
-              </a>
-            ))}
-          </div>
-        </div>
-
-        {/* Real-Asset Check Panel */}
-        <div
-          className={`rounded-xl p-5 flex flex-col h-[320px] border shadow-xl ${
-            incident.real_asset_touched
-              ? "bg-crit/5 border-crit/30"
-              : "bg-panel-card border-line"
-          }`}
-        >
-          <div className="flex items-center justify-between pb-2 mb-4 border-b border-line">
-            <h3 className="text-[10px] font-bold text-mute uppercase tracking-widest">
-              Critical Asset Contact
-            </h3>
-            {incident.real_asset_touched ? (
-              <span className="px-2 py-0.5 rounded bg-crit/20 text-crit text-[9px] font-bold uppercase tracking-widest animate-pulse">Intrusion Alert</span>
-            ) : (
-              <span className="px-2 py-0.5 rounded bg-low/20 text-low text-[9px] font-bold uppercase tracking-widest">No Contact</span>
+          <div className="card">
+            <div className="card-title" style={{ marginBottom: "0.85rem" }}>Credentials Probed</div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+              {(inc.profile?.creds_tried ?? []).slice(0, 20).map((c, i) => (
+                <span key={i} style={{ padding: "3px 8px", borderRadius: 6, background: "rgba(244,63,94,0.08)", border: "1px solid rgba(244,63,94,0.2)", fontFamily: "var(--font-mono)", fontSize: "0.7rem", color: "#fca5a5" }}>{c}</span>
+              ))}
+              {(inc.profile?.creds_tried ?? []).length === 0 && <span style={{ fontSize: "0.78rem", color: "var(--color-mute)" }}>No credentials captured</span>}
+            </div>
+            {(inc.real_asset_events ?? []).length > 0 && (
+              <>
+                <div className="card-title" style={{ marginTop: "1rem", marginBottom: "0.6rem" }}>Real Asset Contacts</div>
+                {inc.real_asset_events.slice(0, 4).map((e, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10, padding: "0.5rem 0", borderBottom: "1px solid rgba(30,45,69,0.5)", fontSize: "0.75rem" }}>
+                    <span style={{ fontFamily: "var(--font-mono)", color: "var(--color-mute)" }}>{e.ts.slice(11, 19)}</span>
+                    <span style={{ color: "#22c55e" }}>{e.sensor}</span>
+                    <span style={{ color: "var(--color-ink)" }}>{e.action}</span>
+                    <span style={{ color: e.outcome === "success" ? "#f43f5e" : "#64748b" }}>{e.outcome}</span>
+                  </div>
+                ))}
+              </>
             )}
           </div>
+        </div>
+      )}
 
-          <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin">
-            {incident.real_asset_touched ? (
-              incident.real_asset_events.map((ev, i) => (
-                <div key={i} className="p-3 rounded-lg bg-panel border border-line group hover:border-crit/30 transition-all">
-                  <div className="flex justify-between items-center mb-1">
-                    <div className="text-[9px] text-crit font-bold mono uppercase tracking-tighter">
-                      {ev.ts.slice(11, 19)} UTC
-                    </div>
-                    <div className="text-[9px] text-mute font-mono">{ev.sensor}</div>
+      {/* Timeline */}
+      {activeTab === "timeline" && (
+        <AttackTimeline events={inc.timeline ?? []} maxHeight={720} />
+      )}
+
+      {/* Commands */}
+      {activeTab === "commands" && (
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: "0.85rem" }}>
+            <Terminal size={13} style={{ verticalAlign: "middle", marginRight: 6 }} />
+            SSH Command Transcript ({(inc.transcript ?? []).length} commands)
+          </div>
+          <div className="terminal" style={{ maxHeight: 400, overflowY: "auto" }}>
+            <div style={{ color: "#475569", marginBottom: 8 }}># Cowrie SSH honeypot — captured shell session</div>
+            {(inc.transcript ?? []).length === 0
+              ? <div style={{ color: "#64748b", fontStyle: "italic" }}>No commands captured in this session.</div>
+              : (inc.transcript ?? []).map((t, i) => (
+                  <div key={i} style={{ display: "flex", gap: 10 }}>
+                    <span className="ts">[{t.ts.slice(11, 19)}]</span>
+                    <span className="prompt">root@db-prod-02:~#</span>
+                    <span className="cmd">{t.cmd}</span>
                   </div>
-                  <div className="text-[11px] text-ink font-medium">
-                    {ev.summary || `${ev.action}:${ev.outcome}`}
+                ))
+            }
+          </div>
+        </div>
+      )}
+
+      {/* Techniques */}
+      {activeTab === "techniques" && (
+        <div className="card">
+          <div className="card-title" style={{ marginBottom: "0.85rem" }}>MITRE ATT&CK Techniques Observed</div>
+          {(inc.techniques ?? []).length === 0 ? (
+            <div className="empty-state"><Shield size={24} /><p>No techniques mapped</p></div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: 8 }}>
+              {inc.techniques.map((t) => (
+                <div key={t.id} style={{ padding: "0.75rem 0.85rem", background: "rgba(59,130,246,0.05)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+                    <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.7rem", fontWeight: 800, color: "#3b82f6" }}>{t.id}</span>
+                    <span style={{ fontSize: "0.6rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", padding: "1px 6px", borderRadius: 4, background: "rgba(59,130,246,0.1)", color: "#93c5fd" }}>{t.tactic}</span>
                   </div>
+                  <div style={{ fontSize: "0.78rem", fontWeight: 600, color: "var(--color-ink)" }}>{t.name}</div>
                 </div>
-              ))
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center text-center space-y-3 opacity-50">
-                <ShieldCheck size={40} className="text-low" />
-                <p className="text-[11px] text-mute max-w-[180px]">No adversary contact observed against production assets.</p>
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
-      {/* 2-Column Grid: Session Transcript & Response Actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-panel-card border border-line rounded-xl overflow-hidden shadow-2xl min-h-[400px]">
-          <Transcript transcript={incident.transcript || []} />
+      {/* Actions */}
+      {activeTab === "actions" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.85rem" }}>
+          <div className="notice notice-info">
+            <Info size={14} style={{ flexShrink: 0 }} />
+            Production-affecting actions require explicit approval. Use "Dry Run" to preview impact before applying.
+          </div>
+          {(inc.actions ?? []).length === 0 ? (
+            <div className="empty-state"><Zap size={24} /><p>No actions recommended yet</p></div>
+          ) : (inc.actions ?? []).map((act) => {
+            const cfg = ACTION_COLOR[act.type] ?? ACTION_COLOR.monitor;
+            const isExecuting = executing[act.id];
+            const result = actionResults[act.id];
+            const isDone = act.status === "approved" || act.status === "executed";
+            return (
+              <div key={act.id} className="card" style={{ borderColor: cfg.border, padding: "1.1rem 1.25rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "1rem", flexWrap: "wrap" }}>
+                  <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flex: 1 }}>
+                    <div style={{ width: 34, height: 34, borderRadius: 10, background: cfg.bg, border: `1px solid ${cfg.border}`, display: "flex", alignItems: "center", justifyContent: "center", color: cfg.color, flexShrink: 0, marginTop: 2 }}>
+                      {ACTION_ICONS[act.type] ?? <Zap size={14} />}
+                    </div>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>
+                        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--color-ink)" }}>{act.title}</span>
+                        <span style={{ fontSize: "0.62rem", fontWeight: 700, padding: "1px 6px", borderRadius: 999, background: isDone ? "rgba(34,197,94,0.1)" : "rgba(100,116,139,0.1)", color: isDone ? "#22c55e" : "#64748b", border: `1px solid ${isDone ? "rgba(34,197,94,0.25)" : "rgba(100,116,139,0.2)"}`, textTransform: "uppercase" }}>{act.status}</span>
+                        {act.requires_approval && <span style={{ fontSize: "0.6rem", padding: "1px 5px", borderRadius: 4, background: "rgba(234,179,8,0.1)", color: "#eab308", border: "1px solid rgba(234,179,8,0.2)" }}>Requires Approval</span>}
+                      </div>
+                      <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--color-mute)" }}>{act.why}</p>
+                      {result && (
+                        <div style={{ marginTop: 6, padding: "0.5rem 0.75rem", background: "rgba(34,197,94,0.06)", border: "1px solid rgba(34,197,94,0.2)", borderRadius: 8, fontSize: "0.72rem", color: "#86efac", fontFamily: "var(--font-mono)" }}>
+                          {result}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {!isDone && (
+                    <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                      <button className="btn btn-ghost btn-sm" disabled={isExecuting} onClick={() => handleAction(act, "dry_run")}>
+                        {isExecuting ? "…" : "Dry Run"}
+                      </button>
+                      {act.requires_approval && (
+                        <button className="btn btn-danger btn-sm" disabled={isExecuting} onClick={() => handleAction(act, "approve")}>
+                          {isExecuting ? "Executing…" : "Approve & Execute"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {isDone && <CheckCircle size={18} style={{ color: "#22c55e", flexShrink: 0 }} />}
+                </div>
+              </div>
+            );
+          })}
         </div>
-        <div className="bg-panel-card border border-line rounded-xl overflow-hidden shadow-2xl min-h-[400px]">
-          <ActionsPanel
-            incidentId={incident.id}
-            actions={incident.actions || []}
-            onActionComplete={loadData}
-          />
-        </div>
-      </div>
+      )}
     </div>
   );
 }

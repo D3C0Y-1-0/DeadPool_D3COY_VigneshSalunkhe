@@ -36,15 +36,33 @@ function useLiveState() {
   const refreshAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [st, incList, evList] = await Promise.all([
+      const [stRes, incRes, evRes] = await Promise.allSettled([
         fetchStats(),
         fetchIncidents(),
         fetchEvents(100)
       ]);
-      setStats(st);
-      setIncidents(Object.fromEntries(incList.map((incident) => [incident.id, incident])));
-      setEvents(evList);
-      setError(null);
+      const failures: string[] = [];
+      if (stRes.status === 'fulfilled') {
+        setStats(stRes.value);
+      } else {
+        failures.push(errorMessage(stRes.reason));
+      }
+      if (incRes.status === 'fulfilled') {
+        setIncidents((previous) => Object.fromEntries(
+          incRes.value.map((incident) => [
+            incident.id,
+            { ...previous[incident.id], ...incident }
+          ])
+        ));
+      } else {
+        failures.push(errorMessage(incRes.reason));
+      }
+      if (evRes.status === 'fulfilled') {
+        setEvents(evRes.value);
+      } else {
+        failures.push(errorMessage(evRes.reason));
+      }
+      setError(failures.length > 0 ? failures.join(" · ") : null);
     } catch (cause) {
       setError(errorMessage(cause));
     } finally {
@@ -72,6 +90,7 @@ function useLiveState() {
         ws.onopen = () => {
           retryCount = 0;
           setConnected(true);
+          refreshAll();
         };
 
         ws.onclose = () => {

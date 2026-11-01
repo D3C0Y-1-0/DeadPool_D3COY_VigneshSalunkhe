@@ -14,6 +14,7 @@ from .db import (
 )
 from .schema import NormalizedEvent
 from . import collector
+from .middleware import AgentEventBodyLimit
 from .engine.classify import classify
 from .engine.evaluate import evaluate
 from .engine.respond import recommend
@@ -21,7 +22,7 @@ from .geo import geo
 
 from .api import (
     health, metrics, events, incidents,
-    attackers, techniques, actions, exports, demo
+    attackers, techniques, actions, exports, demo, agents
 )
 
 app = FastAPI(
@@ -38,6 +39,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AgentEventBodyLimit, max_bytes=512 * 1024)
 
 clients: set[WebSocket] = set()
 _ip_locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
@@ -54,6 +56,7 @@ app.include_router(techniques.router)
 app.include_router(actions.router)
 app.include_router(exports.router)
 app.include_router(demo.router)
+app.include_router(agents.router)
 
 async def broadcast(kind: str, payload: dict):
     dead = []

@@ -2,8 +2,12 @@ import os
 import json
 import uuid
 from fastapi import APIRouter, HTTPException, Body
+from sqlalchemy import text
 
-from ..db import SessionLocal, EventRow, IncidentRow, ActionRow, AuditLogRow, IncidentEventRow
+from ..db import (
+    SessionLocal, EventRow, IncidentRow, ActionRow,
+    AuditLogRow, IncidentEventRow, AttackTechniqueRow, AttackerRow
+)
 from ..collector import reset_scan_detector
 
 router = APIRouter(tags=["Demo Control"])
@@ -31,12 +35,21 @@ def demo_status():
 @router.post("/api/demo/reset")
 def demo_reset():
     with SessionLocal() as db:
-        db.query(EventRow).delete()
-        db.query(IncidentRow).delete()
-        db.query(ActionRow).delete()
-        db.query(IncidentEventRow).delete()
-        db.query(AuditLogRow).delete()
-        db.commit()
+        # For Postgres, TRUNCATE with CASCADE cleanly wipes all dependent tables
+        # For SQLite fallback, delete child tables first to respect foreign keys
+        try:
+            db.execute(text("TRUNCATE TABLE incident_events, actions, audit_log, attack_techniques, incidents, events, attackers CASCADE;"))
+            db.commit()
+        except Exception:
+            db.rollback()
+            db.query(IncidentEventRow).delete()
+            db.query(ActionRow).delete()
+            db.query(AuditLogRow).delete()
+            db.query(AttackTechniqueRow).delete()
+            db.query(IncidentRow).delete()
+            db.query(AttackerRow).delete()
+            db.query(EventRow).delete()
+            db.commit()
 
     reset_scan_detector()
 

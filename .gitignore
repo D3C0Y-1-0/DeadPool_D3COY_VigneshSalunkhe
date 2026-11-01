@@ -25,6 +25,8 @@ dist/
 *.sqlite
 *.sqlite3
 *.db
+endpoint-agent/mirage-agent.json
+endpoint-agent/state/
 pgdata/
 volumes/
 /shared/blocklist.txt

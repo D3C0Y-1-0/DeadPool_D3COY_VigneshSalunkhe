@@ -1,158 +1,111 @@
 "use client";
 
-import { useMemo } from "react";
-import { useLive } from "../useLive";
-import { Activity, Radio } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { fetchSensorStatus, SensorStatus } from "../api";
+import { Activity, RefreshCw, Server, Shield, Wifi } from "lucide-react";
 
-const KNOWN_DECOY_SENSORS = ["db-prod-02", "portal.internal", "sql-prod-01", "files-prod", "mgmt-lure"];
-
-const LIVE_WINDOW_MS = 120_000;
-
-interface SensorAgg {
-  sensor: string;
-  zones: Set<string>;
-  count: number;
-  actions: Set<string>;
-  lastTs: string | null;
-}
-
-function formatTs(ts: string | null): string {
-  if (!ts) return "—";
-  const date = new Date(ts);
-  if (Number.isNaN(date.getTime())) return ts;
-  return date.toLocaleTimeString();
-}
+const SENSOR_META: Record<string, { name: string; type: string; color: string; desc: string }> = {
+  cowrie:     { name: "Cowrie SSH Decoy",   type: "SSH Honeypot",      color: "#f43f5e", desc: "Simulates db-prod-02 SSH on port 2222" },
+  portal:     { name: "Web Portal Trap",    type: "HTTP Honeypot",     color: "#3b82f6", desc: "Fake customer portal on port 8080" },
+  opencanary: { name: "OpenCanary Decoy",   type: "MySQL / FTP Trap",  color: "#22c55e", desc: "MySQL 3306 + FTP 21 decoy services" },
+  tripwire:   { name: "Tripwire Listener",  type: "TCP Port Monitor",  color: "#eab308", desc: "Canary token on ports 2323, 9200" },
+  prod:       { name: "Production Shield",  type: "Firewall Monitor",  color: "#8b5cf6", desc: "prod-web-01 firewall / auth log feed" },
+};
 
 export default function Sensors() {
-  const { events, error } = useLive();
+  const [sensors, setSensors] = useState<SensorStatus[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const sensors = useMemo<SensorAgg[]>(() => {
-    const map = new Map<string, SensorAgg>();
+  const load = () => {
+    setLoading(true);
+    setError(null);
+    fetchSensorStatus()
+      .then(setSensors)
+      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "Could not load sensor telemetry."))
+      .finally(() => setLoading(false));
+  };
+  useEffect(load, []);
 
-    const ensure = (name: string): SensorAgg => {
-      let agg = map.get(name);
-      if (!agg) {
-        agg = { sensor: name, zones: new Set<string>(), count: 0, actions: new Set<string>(), lastTs: null };
-        map.set(name, agg);
-      }
-      return agg;
-    };
-
-    KNOWN_DECOY_SENSORS.forEach(ensure);
-
-    events.forEach((event) => {
-      const agg = ensure(event.sensor || "unknown");
-      agg.count += 1;
-      if (event.zone) agg.zones.add(event.zone);
-      if (event.action) agg.actions.add(event.action);
-      if (!agg.lastTs || new Date(event.ts).getTime() > new Date(agg.lastTs).getTime()) {
-        agg.lastTs = event.ts;
-      }
-    });
-
-    return Array.from(map.values()).sort((a, b) => {
-      if (b.count !== a.count) return b.count - a.count;
-      return a.sensor.localeCompare(b.sensor);
-    });
-  }, [events]);
-
-  const totalEvents = useMemo(() => sensors.reduce((acc, sensor) => acc + sensor.count, 0), [sensors]);
-  const now = Date.now();
-  const isLive = (sensor: SensorAgg): boolean =>
-    sensor.lastTs !== null && now - new Date(sensor.lastTs).getTime() <= LIVE_WINDOW_MS;
-  const activeSensors = sensors.filter(isLive).length;
+  const combined = sensors.map((sensor) => ({
+    ...{
+      name: sensor.asset || sensor.sensor,
+      type: "Telemetry source",
+      color: "#111827",
+      desc: "Configured sensor returned by the backend.",
+    },
+    ...SENSOR_META[sensor.sensor],
+    ...sensor,
+  }));
+  const seenSensors = combined.filter((sensor) => sensor.last_event).length;
 
   return (
-    <div className="page-content">
-      {error && (
-        <div role="alert" className="notice notice-danger">
-          Sensor telemetry unavailable: {error}
-        </div>
-      )}
-
-      <section className="page-heading">
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
         <div>
-          <div className="eyebrow">DECOYS</div>
-          <h1>Decoy Sensor Fleet</h1>
-          <p>Live health and activity for every honeypot sensor across the deception network.</p>
+          <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--color-accent)", marginBottom: 4 }}>Deception Infrastructure</div>
+          <h1 style={{ margin: 0, fontSize: "1.8rem", fontWeight: 800, letterSpacing: "-0.03em" }}>Honeypot Fleet</h1>
+          <p style={{ margin: "0.3rem 0 0", fontSize: "0.82rem", color: "var(--color-mute)" }}>Status and telemetry for all active deception sensors</p>
         </div>
-        <div className="filter-row text-[11px]">
-          <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
-            Sensors: <b className="text-slate-900">{sensors.length}</b>
-          </span>
-          <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
-            Active: <b className="text-emerald-600">{activeSensors}</b>
-          </span>
-          <span className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5">
-            Events: <b className="text-amber-600">{totalEvents}</b>
-          </span>
-        </div>
-      </section>
+        <button className="btn btn-ghost btn-sm" onClick={load} style={{ gap: 6 }}>
+          <RefreshCw size={13} className={loading ? "animate-spin" : ""} /> Refresh
+        </button>
+      </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {sensors.map((sensor) => {
-          const live = isLive(sensor);
-          const zone = sensor.zones.has("production")
-            ? "production"
-            : sensor.zones.has("deception")
-              ? "deception"
-              : "deception";
-          const actionTypes = Array.from(sensor.actions);
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "0.75rem" }}>
+        {[
+          { label: "Total Sensors",     val: combined.length, color: "#3b82f6" },
+          { label: "Deception Decoys",  val: combined.filter((s) => s.zone === "deception").length, color: "#8b5cf6" },
+          { label: "Sources with telemetry", val: `${seenSensors}/${combined.length}`, color: "#111827" },
+        ].map((s) => (
+          <div key={s.label} className="card" style={{ padding: "0.85rem 1rem" }}>
+            <div style={{ fontSize: "0.62rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--color-mute)", marginBottom: 4 }}>{s.label}</div>
+            <div style={{ fontSize: "1.5rem", fontWeight: 800, fontFamily: "var(--font-mono)", color: s.color }}>{s.val}</div>
+          </div>
+        ))}
+      </div>
 
-          return (
-            <div key={sensor.sensor} className="panel panel-shadow flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <Radio className={`h-4 w-4 flex-shrink-0 ${live ? "text-emerald-600" : "text-slate-400"}`} />
-                  <span className="mono truncate text-sm font-semibold text-slate-900">{sensor.sensor}</span>
-                </div>
-                <span className={`status-badge flex-shrink-0 ${live ? "badge-normal" : "badge-warning"}`}>
-                  {live ? "Live" : "Quiet"}
-                </span>
+      {error && <div className="notice notice-warning" role="status">Sensor telemetry unavailable: {error}</div>}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(320px,1fr))", gap: "1rem" }}>
+        {loading ? (
+          <div className="card empty-state" style={{ minHeight: 180 }}>Loading sensor telemetry…</div>
+        ) : combined.length === 0 ? (
+          <div className="card empty-state" style={{ minHeight: 180 }}>No configured sensor sources were returned.</div>
+        ) : combined.map((s) => (
+          <div key={s.sensor} className="card" style={{ borderColor: `${s.color}30`, padding: "1.25rem" }}>
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: "0.85rem" }}>
+              <div style={{ width: 40, height: 40, borderRadius: 11, background: `${s.color}12`, border: `1px solid ${s.color}30`, display: "flex", alignItems: "center", justifyContent: "center", color: s.color, flexShrink: 0 }}>
+                <Server size={18} />
               </div>
-
-              <div className="flex items-center gap-2">
-                <span className={`status-badge ${zone === "production" ? "badge-warning" : "badge-info"}`}>
-                  {zone}
-                </span>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--color-ink)" }}>{s.name}</div>
+                <div style={{ fontSize: "0.68rem", color: "var(--color-mute)", marginTop: 2 }}>{s.type}</div>
               </div>
-
-              <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Events</div>
-                  <div className="mono text-base font-bold text-slate-900">{sensor.count}</div>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Last Seen</div>
-                  <div className="mono text-slate-900">{formatTs(sensor.lastTs)}</div>
-                </div>
-              </div>
-
-              <div>
-                <div className="mb-1.5 flex items-center gap-1.5 text-[11px] text-slate-500">
-                  <Activity className="h-3 w-3" />
-                  <span>
-                    Distinct actions: <b className="mono text-slate-900">{actionTypes.length}</b>
-                  </span>
-                </div>
-                {actionTypes.length === 0 ? (
-                  <span className="text-[10px] italic text-slate-400">No activity observed</span>
-                ) : (
-                  <div className="flex flex-wrap gap-1">
-                    {actionTypes.map((action) => (
-                      <span
-                        key={action}
-                        className="mono rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600"
-                      >
-                        {action}
-                      </span>
-                    ))}
-                  </div>
-                )}
+              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "0.65rem", fontWeight: 700, color: s.last_event ? "#15803d" : "#737373" }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.last_event ? "#22c55e" : "#d1d5db" }} />
+                {s.last_event ? "Telemetry observed" : "Awaiting telemetry"}
               </div>
             </div>
-          );
-        })}
+            <div style={{ fontSize: "0.72rem", color: "var(--color-mute)", marginBottom: "0.75rem", lineHeight: 1.5 }}>{s.desc}</div>
+            <div style={{ display: "flex", gap: 12, fontSize: "0.72rem" }}>
+              <div>
+                <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(100,116,139,0.7)", marginBottom: 2 }}>Zone</div>
+                <div style={{ fontWeight: 700, color: s.zone === "deception" ? "#8b5cf6" : "#22c55e", textTransform: "uppercase", fontSize: "0.7rem" }}>{s.zone}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(100,116,139,0.7)", marginBottom: 2 }}>Total Events</div>
+                <div style={{ fontWeight: 700, fontFamily: "var(--font-mono)", color: s.color }}>{s.total_events.toLocaleString()}</div>
+              </div>
+              <div>
+                <div style={{ fontSize: "0.6rem", textTransform: "uppercase", letterSpacing: "0.08em", color: "rgba(100,116,139,0.7)", marginBottom: 2 }}>Last Event</div>
+                <div style={{ fontFamily: "var(--font-mono)", color: "var(--color-mute)", fontSize: "0.68rem" }}>
+                  {s.last_event ? new Date(s.last_event).toLocaleTimeString() : "—"}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
