@@ -30,19 +30,62 @@ def cadence(cmd_events: list[dict]) -> tuple[str, Optional[float]]:
     if not cmd_events or len(cmd_events) < 3:
         return "unknown", None
     try:
-        ts = sorted(_parse_ts(e["ts"]) for e in cmd_events)
-        gaps = [(b - a).total_seconds() for a, b in zip(ts, ts[1:])]
-        if not gaps:
+        sessions = {}
+        ungrouped = []
+        for event in cmd_events:
+            session_id = event.get("session_id")
+            group_key = (
+                event.get("sensor") or event.get("source") or "unknown",
+                session_id
+            )
+            if session_id:
+                sessions.setdefault(group_key, []).append(event)
+            else:
+                ungrouped.append(event)
+
+        # Without a session ID, split each sensor's commands after a 10-minute idle gap.
+        by_sensor = {}
+        for event in ungrouped:
+            sensor = event.get("sensor") or event.get("source") or "unknown"
+            by_sensor.setdefault(sensor, []).append(event)
+        for sensor, events in by_sensor.items():
+            ordered = sorted(events, key=lambda e: _parse_ts(e["ts"]))
+            segment = []
+            previous = None
+            for event in ordered:
+                timestamp = _parse_ts(event["ts"])
+                if previous is not None and (timestamp - previous).total_seconds() > 600:
+                    sessions[(sensor, len(sessions))] = segment
+                    segment = []
+                segment.append(event)
+                previous = timestamp
+            if segment:
+                sessions[(sensor, len(sessions))] = segment
+
+        measurements = []
+        for session_events in sessions.values():
+            if len(session_events) < 3:
+                continue
+            timestamps = sorted(_parse_ts(event["ts"]) for event in session_events)
+            gaps = [(b - a).total_seconds() for a, b in zip(timestamps, timestamps[1:])]
+            if not gaps:
+                continue
+            med = statistics.median(gaps)
+            mean = statistics.mean(gaps)
+            cv = (statistics.pstdev(gaps) / mean) if mean > 0 else 0
+            if med < 0.6:
+                classification = "bot"
+            elif med >= 1.5 and cv >= 0.3:
+                classification = "human"
+            else:
+                classification = "scripted"
+            measurements.append((max(timestamps), classification, round(med, 2)))
+
+        if not measurements:
             return "unknown", None
-        med = statistics.median(gaps)
-        mean = statistics.mean(gaps)
-        cv = (statistics.pstdev(gaps) / mean) if mean > 0 else 0
-        if med < 0.6:
-            return "bot", round(med, 2)
-        if med >= 1.5 and cv >= 0.3:
-            return "human", round(med, 2)
-        return "scripted", round(med, 2)
-    except Exception:
+        _, classification, med = max(measurements, key=lambda item: item[0])
+        return classification, med
+    except (KeyError, TypeError, ValueError):
         return "unknown", None
 
 def summarize(e: dict) -> str:
@@ -93,8 +136,12 @@ def evaluate(src_ip: str, events: list[dict]) -> dict:
     if not events:
         return {}
 
-    dec = [e for e in events if e.get("zone") == "deception"]
-    prod = [e for e in events if e.get("zone") == "production"]
+    source_events = [e for e in events if e.get("src_ip") == src_ip]
+    if not source_events:
+        return {}
+
+    dec = [e for e in source_events if e.get("zone") == "deception"]
+    prod = [e for e in source_events if e.get("zone") == "production"]
     if not dec and not prod:
         return {}
 
@@ -103,6 +150,18 @@ def evaluate(src_ip: str, events: list[dict]) -> dict:
     max_stage = max(stages, key=ORDER.index) if stages else "recon"
 
     techs = sorted({t for e in all_ev for t in e.get("techniques", [])})
+    failed_auth = [
+        e for e in dec
+        if e.get("action") == "auth" and e.get("outcome") == "failure"
+    ]
+    distinct_failed_users = {
+        e.get("user", "").strip().lower()
+        for e in failed_auth
+        if isinstance(e.get("user"), str) and e.get("user", "").strip()
+    }
+    password_spray = len(failed_auth) >= 5 and len(distinct_failed_users) >= 3
+    if password_spray:
+        techs = sorted(set(techs) | {"T1110.003"})
     flags = Counter(f for e in all_ev for f in e.get("flags", []))
     sensors = {e.get("sensor") for e in dec if e.get("sensor") and e.get("sensor") != "scan-detector"}
     sessions = {e.get("session_id") for e in dec if e.get("session_id")}
@@ -122,6 +181,11 @@ def evaluate(src_ip: str, events: list[dict]) -> dict:
         duration = 0.0
 
     factors = [dict(label=f"Stage reached: {max_stage}", points=STAGE_POINTS.get(max_stage, 10))]
+    if password_spray:
+        factors.append(dict(
+            label="Password spray pattern: >=5 failed logins across >=3 usernames",
+            points=0
+        ))
     tgt = 0
     noise = 0
 

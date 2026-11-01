@@ -74,15 +74,28 @@ function useLiveState() {
     refreshAll();
 
     let retryTimeout: ReturnType<typeof setTimeout> | undefined;
+    let pingInterval: ReturnType<typeof setInterval> | undefined;
+    let pollInterval: ReturnType<typeof setInterval> | undefined;
     let stopped = false;
     let retryCount = 0;
+
     const connect = () => {
       if (stopped) return;
       const configured = process.env.NEXT_PUBLIC_WS_URL;
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = configured && configured.length > 0
-        ? configured
-        : `${protocol}//${window.location.hostname}:8000/ws/live`;
+      const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+      const protocol = isHttps ? "wss:" : "ws:";
+      
+      let wsUrl: string;
+      if (configured && configured.length > 0) {
+        wsUrl = configured;
+      } else if (isHttps) {
+        // If accessed through HTTPS/reverse proxy (ngrok, tunnel, domain), use same host
+        wsUrl = `${protocol}//${window.location.host}/ws/live`;
+      } else if (typeof window !== "undefined") {
+        wsUrl = `${protocol}//${window.location.hostname}:8000/ws/live`;
+      } else {
+        wsUrl = "ws://localhost:8000/ws/live";
+      }
 
       try {
         const ws = new WebSocket(wsUrl);
@@ -96,7 +109,7 @@ function useLiveState() {
         ws.onclose = () => {
           if (stopped) return;
           setConnected(false);
-          const delay = Math.min(30000, 1000 * 2 ** retryCount);
+          const delay = Math.min(3000, 1000 + retryCount * 500);
           retryCount += 1;
           retryTimeout = setTimeout(connect, delay);
         };
@@ -109,6 +122,11 @@ function useLiveState() {
           try {
             const parsed = JSON.parse(msg.data);
             const { kind, data } = parsed;
+
+            if (kind === "pong") {
+              // Heartbeat acknowledged
+              return;
+            }
 
             if (kind === "event") {
               setEvents((prev) => [data as NormalizedEvent, ...prev].slice(0, 300));
@@ -136,17 +154,32 @@ function useLiveState() {
 
         wsRef.current = ws;
       } catch (cause) {
-        console.error("Could not connect to the MIRAGE live stream.", cause);
         setConnected(false);
-        retryTimeout = setTimeout(connect, 5000);
+        retryTimeout = setTimeout(connect, 2000);
       }
     };
 
     connect();
 
+    // 10-second client-side keepalive ping to prevent idle connection termination
+    pingInterval = setInterval(() => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.send("ping");
+        } catch {}
+      }
+    }, 10000);
+
+    // 4-second background safety-net polling so dashboard ALWAYS has live data
+    pollInterval = setInterval(() => {
+      refreshAll();
+    }, 4000);
+
     return () => {
       stopped = true;
       if (retryTimeout) clearTimeout(retryTimeout);
+      if (pingInterval) clearInterval(pingInterval);
+      if (pollInterval) clearInterval(pollInterval);
       wsRef.current?.close();
     };
   }, [refreshAll]);

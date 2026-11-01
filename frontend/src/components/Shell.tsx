@@ -4,8 +4,8 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  Activity, AlertCircle, Bell, BookOpen, ChevronDown,
-  Crosshair, Database, FileText, Globe, Grid3x3,
+  Activity, AlertCircle, Bell, ChevronDown,
+  Crosshair, FileText, Globe, Grid3x3,
   Home, LayoutDashboard, LogOut, Monitor, PanelLeftClose, PanelLeftOpen,
   Radio, RotateCw, Search, Server, Settings, Shield, ShieldAlert,
   ShieldCheck, Terminal, Users, Zap, X
@@ -46,8 +46,6 @@ const NAV_SECTIONS = [
     items: [
       { href: "/dashboard/sensors",       label: "Honeypot Fleet",      icon: Server },
       { href: "/dashboard/endpoint",      label: "Endpoint Monitoring", icon: ShieldCheck, badge: "LIVE" },
-      { href: "/dashboard/cases",         label: "Case Management",     icon: Database },
-      { href: "/dashboard/playbooks",     label: "Playbooks",           icon: BookOpen },
       { href: "/dashboard/reports",       label: "Reports",             icon: FileText },
       { href: "/dashboard/vulnerability", label: "Exploit Probes",      icon: ShieldAlert },
     ],

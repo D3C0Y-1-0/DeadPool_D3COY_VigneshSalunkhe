@@ -18,8 +18,14 @@ techniques:
   T1595.001:
     name: Scanning IP Blocks
     tactic: Reconnaissance
+  T1595.003:
+    name: Wordlist Scanning
+    tactic: Reconnaissance
   T1110.001:
     name: Password Guessing
+    tactic: Credential Access
+  T1110.003:
+    name: Password Spraying
     tactic: Credential Access
   T1110.004:
     name: Credential Stuffing
@@ -107,11 +113,24 @@ rules:
     stage: initial_access
     category: initial_access
 
-  - id: web_exploit
+  - id: web_exploit_login
     when: {action: auth, flag_any: [sqli, traversal]}
     techniques: [T1190]
     stage: initial_access
     category: exploitation
+
+  - id: web_exploit_request
+    when: {action: web_request, flag_any: [sqli, traversal]}
+    techniques: [T1190]
+    stage: initial_access
+    category: exploitation
+
+  - id: lure_path
+    when: {action: web_request, regex: '^/admin-backup/?(?:[?#].*)?$'}
+    techniques: [T1595.003]
+    stage: recon
+    category: scanning
+    flag: targeted_lure
 
   - id: shell
     when: {action: command}

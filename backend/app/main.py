@@ -229,8 +229,13 @@ async def websocket_endpoint(w: WebSocket):
     try:
         while True:
             # Keepalive receiver
-            await w.receive_text()
-    except WebSocketDisconnect:
+            msg = await w.receive_text()
+            if msg == "ping":
+                try:
+                    await w.send_text('{"kind":"pong"}')
+                except Exception:
+                    break
+    except (WebSocketDisconnect, asyncio.CancelledError):
         clients.discard(w)
     except Exception:
         clients.discard(w)

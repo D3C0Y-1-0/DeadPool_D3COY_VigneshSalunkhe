@@ -25,9 +25,10 @@
 | Category | Typical signals | Example ATT&CK |
 |---|---|---|
 | `scanning` | multi-port connects, tripwire hits | T1046, T1595.001 |
-| `brute_force` | repeated failed auth | T1110.001 (guessing), T1110.003/.004 (spraying/stuffing when many users or known-leak pairs) |
+| `brute_force` | repeated failed auth | T1110.001 (guessing); correlated password spray maps to T1110.003 after ≥5 failures across ≥3 distinct usernames |
 | `initial_access` | successful auth with default creds | T1078.001 |
-| `exploitation` | SQLi / traversal flags on portal | T1190 |
+| `exploitation` | SQLi / traversal flags on portal login or web-request events | T1190 |
+| `scanning` | request to the planted `/admin-backup/` lure | T1595.003; `targeted_lure` flag |
 | `post_compromise` | shell commands, discovery, collection, tool download | T1059.004, T1083, T1082, T1033, T1005, T1105, T1552.001 |
 | `exfiltration` | decoy file download, crown-jewel read | T1005 + T1041 |
 | `persistence` | authorized_keys, cron, history clearing | T1098.004, T1053.003, T1070.003 |
@@ -139,6 +140,8 @@ for each attacker IP A:
 
 Because **no legitimate user knows these exist**, a hit is a confirmed indicator → +30 and Critical override.
 
+The `/admin-backup/` lure is a recon signal only; it does not by itself prove exploitation or raise the risk score.
+
 ### 6.4 Telemetry sources used in correlation
 | Source | Fields used |
 |---|---|
@@ -146,6 +149,9 @@ Because **no legitimate user knows these exist**, a hit is a confirmed indicator
 | prod auth | src IP, user, outcome, honeytoken flag |
 | decoys | everything |
 | (extension) VPN/IdP logs | user ↔ IP map |
+
+### 6.5 Correlated password spraying
+The evaluator adds ATT&CK `T1110.003` when one source IP produces at least **5 failed deception auth events** across at least **3 distinct non-empty usernames** in the existing 30-minute correlation window. The incident includes a zero-point factor to explain the classification. This signal does not add a new scoring modifier or alter the frozen incident schema. Credential stuffing (`T1110.004`) is not inferred from username/password variation alone because the engine has no evidence those credentials were previously exposed.
 
 ## 7. Attacker profile (what the analyst sees)
 
@@ -160,7 +166,9 @@ Because **no legitimate user knows these exist**, a hit is a confirmed indicator
 | Timeline | all events, stage-tagged |
 | Verdict + score + factors | engine |
 
-**Cadence algorithm:** collect command timestamps in a session; need ≥3. `median gap < 0.6s → bot`; `median ≥ 1.5s and coefficient of variation ≥ 0.3 → human`; otherwise `scripted`.
+**Cadence algorithm:** classify the most recent session with at least 3 commands; command timestamps are never mixed across known session IDs. If a session ID is unavailable, commands are grouped by sensor and split after a 10-minute idle gap. `median gap < 0.6s → bot`; `median ≥ 1.5s and coefficient of variation ≥ 0.3 → human`; otherwise `scripted`.
+
+The engine performs deterministic rule-based classification and scoring, not trained-ML forecasting. It describes observed behavior; a future-stage prediction would require a separately agreed incident/API contract and should not be presented as a verified outcome.
 
 ## 8. Noise reduction accounting (live KPI)
 ```

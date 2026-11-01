@@ -203,6 +203,77 @@ def test_cadence_bot_vs_human():
     cad_human, _ = cadence(human_cmds)
     assert cad_human == "human"
 
+def test_cadence_does_not_mix_sessions():
+    commands = [
+        {"ts": "2026-10-31T10:00:00Z", "action": "command", "cmd": "a", "session_id": "bot"},
+        {"ts": "2026-10-31T10:00:00.100Z", "action": "command", "cmd": "b", "session_id": "bot"},
+        {"ts": "2026-10-31T10:00:00.200Z", "action": "command", "cmd": "c", "session_id": "bot"},
+        {"ts": "2026-10-31T10:01:00Z", "action": "command", "cmd": "a", "session_id": "human"},
+        {"ts": "2026-10-31T10:01:02Z", "action": "command", "cmd": "b", "session_id": "human"},
+        {"ts": "2026-10-31T10:01:06Z", "action": "command", "cmd": "c", "session_id": "human"},
+    ]
+    assert cadence(commands) == ("human", 3.0)
+
+def test_cadence_splits_sessions_without_ids_after_idle_gap():
+    commands = [
+        {"ts": "2026-10-31T10:00:00Z", "action": "command", "cmd": "a", "sensor": "db-prod-02"},
+        {"ts": "2026-10-31T10:00:03Z", "action": "command", "cmd": "b", "sensor": "db-prod-02"},
+        {"ts": "2026-10-31T10:11:00Z", "action": "command", "cmd": "c", "sensor": "db-prod-02"},
+        {"ts": "2026-10-31T10:11:03Z", "action": "command", "cmd": "d", "sensor": "db-prod-02"},
+    ]
+    assert cadence(commands) == ("unknown", None)
+
+def test_password_spray_correlation():
+    events = [
+        {
+            "ts": f"2026-10-31T10:00:{i:02d}Z",
+            "source": "cowrie",
+            "sensor": "db-prod-02",
+            "zone": "deception",
+            "src_ip": "203.0.113.70",
+            "action": "auth",
+            "outcome": "failure",
+            "user": f"user{i % 3}",
+            "stage": "credential_attack",
+            "techniques": ["T1110.001"]
+        }
+        for i in range(5)
+    ]
+    incident = evaluate("203.0.113.70", events)
+    assert "T1110.003" in {tech["id"] for tech in incident["techniques"]}
+    assert any("Password spray pattern" in factor["label"] for factor in incident["factors"])
+    assert next(f["points"] for f in incident["factors"] if "Password spray pattern" in f["label"]) == 0
+
+def test_password_spray_requires_five_failures_and_three_users():
+    events = [
+        {
+            "ts": f"2026-10-31T10:00:{i:02d}Z",
+            "source": "cowrie",
+            "sensor": "db-prod-02",
+            "zone": "deception",
+            "src_ip": "203.0.113.71",
+            "action": "auth",
+            "outcome": "failure",
+            "user": f"user{i % 2}",
+            "stage": "credential_attack",
+            "techniques": ["T1110.001"]
+        }
+        for i in range(5)
+    ]
+    incident = evaluate("203.0.113.71", events)
+    assert "T1110.003" not in {tech["id"] for tech in incident["techniques"]}
+
+def test_evaluate_ignores_events_from_other_source_ips():
+    events = [{
+        "ts": "2026-10-31T10:00:00Z",
+        "zone": "production",
+        "src_ip": "203.0.113.72",
+        "action": "auth",
+        "stage": "lateral_movement",
+        "techniques": ["T1021.004"]
+    }]
+    assert evaluate("203.0.113.73", events) == {}
+
 def test_performance_1000_events():
     events = []
     base_ts = "2026-10-31T10:00:00.000Z"

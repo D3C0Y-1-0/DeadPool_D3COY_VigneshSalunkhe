@@ -100,6 +100,9 @@ def http_handler(c, ip):
 
 def benign():
     """Generates realistic internal production traffic so correlation is non-trivial."""
+    if os.environ.get("ENABLE_BENIGN_TRAFFIC", "true").lower() in ("0", "false", "no", "off"):
+        print("[prod-sim] Benign background traffic disabled.", flush=True)
+        return
     time.sleep(2)
     while True:
         try:

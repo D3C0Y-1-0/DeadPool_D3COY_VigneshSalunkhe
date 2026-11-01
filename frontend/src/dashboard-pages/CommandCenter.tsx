@@ -133,6 +133,9 @@ export default function CommandCenter() {
         </div>
       </div>
 
+      {/* ── Top Metric Strip with Sparklines ─────────────────────── */}
+      <KpiCards stats={stats} />
+
       {/* ── Attack Visual: Incident Attack Graph (Default) or Kill Chain Pipeline ── */}
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between">
@@ -167,9 +170,6 @@ export default function CommandCenter() {
           <KillChainProgress incidents={incidentList} />
         )}
       </div>
-
-      {/* ── Top Metric Strip with Sparklines ─────────────────────── */}
-      <KpiCards stats={stats} />
 
       {/* ── Perspective View 1: UNIFIED COMMAND CENTER ───────────── */}
       {perspective === "UNIFIED" && (
